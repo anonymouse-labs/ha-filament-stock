@@ -137,6 +137,18 @@
       },
       "unmatched_colors": {
         "name": "Niet gekoppelde kleuren"
+      },
+      "last_deduction": {
+        "name": "Laatste aftrek",
+        "state": {
+          "none": "Nog niets",
+          "booked": "Afgeboekt",
+          "duplicate": "Al afgeboekt",
+          "no_match": "Geen passend bestand",
+          "stopped": "Gestopt, niets afgeboekt",
+          "missed_end": "Einde gemist, niets afgeboekt",
+          "no_printer": "Geen printer gevonden"
+        }
       }
     }
   },

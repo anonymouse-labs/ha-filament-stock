@@ -137,6 +137,18 @@
       },
       "unmatched_colors": {
         "name": "Unmatched colors"
+      },
+      "last_deduction": {
+        "name": "Last deduction",
+        "state": {
+          "none": "Nothing yet",
+          "booked": "Booked",
+          "duplicate": "Already booked",
+          "no_match": "No matching file",
+          "stopped": "Stopped, nothing booked",
+          "missed_end": "End missed, nothing booked",
+          "no_printer": "No printer found"
+        }
       }
     }
   },

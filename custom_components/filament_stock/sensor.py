@@ -21,6 +21,7 @@ from . import FilamentStockConfigEntry
 from .const import DOMAIN, GROUP_KINDS
 from .entity import FilamentStockEntity
 from .stock import GroupState, StockManager
+from .tracker import PrintTracker
 
 PARALLEL_UPDATES = 0
 
@@ -42,6 +43,7 @@ async def async_setup_entry(
             TotalStockSensor(manager, entry),
             NotSlicedSensor(manager, entry),
             UnmatchedSensor(manager, entry),
+            LastDeductionSensor(manager, entry, entry.runtime_data.tracker),
         ]
     )
 
@@ -237,3 +239,40 @@ class UnmatchedSensor(_FixedSensor):
         },
         diagnostic=True,
     )
+
+
+LAST_RESULTS = [
+    "none",
+    "booked",
+    "duplicate",
+    "no_match",
+    "stopped",
+    "missed_end",
+    "no_printer",
+]
+
+
+class LastDeductionSensor(FilamentStockEntity, SensorEntity):
+    """Outcome of the last tracked print: what was booked, or why not."""
+
+    _attr_translation_key = "last_deduction"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = LAST_RESULTS
+    _attr_icon = "mdi:history"
+
+    def __init__(
+        self, manager: StockManager, entry: ConfigEntry, tracker: PrintTracker
+    ) -> None:
+        super().__init__(manager, entry, "last_deduction")
+        self._tracker = tracker
+
+    @property
+    def native_value(self) -> str:
+        result = self._tracker.last.get("result", "none")
+        return result if result in LAST_RESULTS else "none"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attrs = {k: v for k, v in self._tracker.last.items() if k != "result"}
+        attrs["printing"] = bool(self._tracker.jobs)
+        return attrs

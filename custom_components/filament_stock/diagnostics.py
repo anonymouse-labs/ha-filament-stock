@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -34,7 +35,16 @@ async def async_get_config_entry_diagnostics(
     data = entry.runtime_data
     spools = data.spools.data
     queue = data.queue.data
+    tracker = data.tracker
     return {
+        "tracker": {
+            "printers": [sorted(keys) for keys in tracker.printers.values()],
+            "jobs": [
+                {k: v for k, v in asdict(job).items() if k != "serial"}
+                for job in tracker.jobs.values()
+            ],
+            "last": tracker.last,
+        },
         "entry": {
             "data": async_redact_data(dict(entry.data), TO_REDACT),
             "options": dict(entry.options),

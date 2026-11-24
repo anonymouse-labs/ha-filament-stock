@@ -19,3 +19,4 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Diagnostics with redaction of tokens, accounts, keys and device serials.
 - Sensors per color group (stock, needed, balance) and for queue totals, added and removed with the groups.
 - Actions `refresh`, `map_color` and `reset_ledger`; options for nearest color matching.
+- Print tracking via ha-bambulab: the file and grams per color are stored at print start; finish books 100 %, failed books the progress reached, each print is booked once. Last deduction sensor.

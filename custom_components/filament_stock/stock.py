@@ -22,7 +22,7 @@ from .const import (
     DOMAIN,
     STORAGE_VERSION,
 )
-from .ledger import Ledger, SyncResult
+from .ledger import Deduction, Ledger, SyncResult
 from .matcher import Match, Needs, fixed_key, map_needs
 from .print_queue import QueueCoordinator
 from .spools import SpoolCoordinator
@@ -178,19 +178,23 @@ class StockManager:
 
     # Computation
 
-    def _recompute(self) -> None:
+    def _map(self, usage: dict[tuple[str, str], float]) -> Needs:
+        """Map grams per file color to grams per color group."""
         groups = self.spools.data.groups if self.spools.data else {}
         options = self._entry.options
-        stock = self.ledger.stock(groups)
-        usage = self.queue.data.usage() if self.queue.data else {}
-        self.needs = map_needs(
+        return map_needs(
             usage,
             groups,
-            stock,
+            self.ledger.stock(groups),
             fixed=self.fixed,
             nearest=options.get(CONF_MATCH_NEAREST, True),
             max_distance=options.get(CONF_MATCH_DISTANCE, DEFAULT_MATCH_DISTANCE),
         )
+
+    def _recompute(self) -> None:
+        groups = self.spools.data.groups if self.spools.data else {}
+        stock = self.ledger.stock(groups)
+        self.needs = self._map(self.queue.data.usage() if self.queue.data else {})
 
         state: dict[str, GroupState] = {}
         for group_id, group in groups.items():
@@ -236,6 +240,21 @@ class StockManager:
     @property
     def total_needed(self) -> float:
         return sum(self.needs.grams.values())
+
+    # Booking a print
+
+    async def async_book(
+        self, job_id: str, usage: dict[tuple[str, str], float]
+    ) -> tuple[Deduction, Needs]:
+        """Deduct a print from the ledger and save at once."""
+        mapped = self._map(usage)
+        for match in mapped.unmatched:
+            self.unknown_meta[match.group_id] = (match.material, match.color)
+        groups = self.spools.data.groups if self.spools.data else {}
+        result = self.ledger.deduct(job_id, mapped.grams, groups)
+        await self.async_flush()
+        self.async_update()
+        return result, mapped
 
     # Actions
 

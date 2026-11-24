@@ -19,6 +19,7 @@ from .print_queue import QueueCoordinator
 from .services import async_setup_services
 from .spools import SpoolCoordinator
 from .stock import StockManager
+from .tracker import PrintTracker
 
 PLATFORMS = [Platform.SENSOR]
 
@@ -32,6 +33,7 @@ class FilamentStockData:
     spools: SpoolCoordinator
     queue: QueueCoordinator
     manager: StockManager
+    tracker: PrintTracker
 
 
 type FilamentStockConfigEntry = ConfigEntry[FilamentStockData]
@@ -67,10 +69,14 @@ async def async_setup_entry(
 
     manager = StockManager(hass, entry, spools, queue)
     await manager.async_load()
-    entry.runtime_data = FilamentStockData(spools=spools, queue=queue, manager=manager)
+    tracker = PrintTracker(hass, entry, manager)
+    await tracker.async_load()
+    entry.runtime_data = FilamentStockData(
+        spools=spools, queue=queue, manager=manager, tracker=tracker
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    for unsub in manager.async_start():
+    for unsub in [*manager.async_start(), *tracker.async_start()]:
         entry.async_on_unload(unsub)
 
     entry.async_create_background_task(
@@ -88,6 +94,7 @@ async def async_unload_entry(
     """Unload a config entry."""
     data = entry.runtime_data
     await data.manager.async_flush()
+    await data.tracker.async_flush()
     await data.spools.async_flush()
     await data.queue.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
