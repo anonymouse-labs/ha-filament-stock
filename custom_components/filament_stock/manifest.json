@@ -1,0 +1,13 @@
+{
+  "domain": "filament_stock",
+  "name": "Filament Stock",
+  "after_dependencies": ["bambu_lab", "whatsapp_notifier"],
+  "codeowners": ["@anonymouse-labs"],
+  "config_flow": true,
+  "documentation": "https://github.com/anonymouse-labs/ha-filament-stock",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/anonymouse-labs/ha-filament-stock/issues",
+  "requirements": ["curl_cffi==0.17.0", "google-auth==2.63.1"],
+  "version": "0.1.0"
+}

@@ -1,0 +1,29 @@
+# Local work files, never published
+CLAUDE.md
+.claude/
+PROMPT*.md
+PLAN*.md
+prototype*/
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local test data, never commit real slicer files or secrets
+*.gcode.3mf
+secrets*.json
+service_account*.json
