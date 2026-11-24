@@ -49,3 +49,10 @@ def test_drive_placeholders_are_provided(lang: str) -> None:
 
 def test_languages_have_the_same_keys() -> None:
     assert _keys(_load("en")) == _keys(_load("nl"))
+
+
+@pytest.mark.parametrize("lang", ["en", "nl"])
+def test_no_html(lang: str) -> None:
+    """hassfest rejects anything that looks like an HTML tag."""
+    for text in _strings(_load(lang)):
+        assert not re.search(r"<[^>]+>", text), text
