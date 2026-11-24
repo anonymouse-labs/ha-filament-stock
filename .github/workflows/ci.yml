@@ -24,6 +24,15 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy
+      - name: Requirements resolve against the Home Assistant constraints
+        run: |
+          constraints="$(python -c 'import homeassistant, pathlib; print(pathlib.Path(homeassistant.__file__).parent / "package_constraints.txt")')"
+          requirements="$(python -c 'import json; print(" ".join(json.load(open("custom_components/filament_stock/manifest.json"))["requirements"]))')"
+          for platform in musllinux_1_2_x86_64 musllinux_1_2_aarch64; do
+            pip install --dry-run --ignore-installed --target /tmp/requirements-check \
+              --python-version 3.14 --implementation cp --platform "$platform" \
+              --only-binary=:all: -c "$constraints" $requirements
+          done
 
   test:
     runs-on: ubuntu-latest
