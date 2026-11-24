@@ -25,14 +25,14 @@
       },
       "drive": {
         "title": "Google Drive print queue",
-        "description": "Filament Stock reads your sliced plates (`*.gcode.3mf`) from a Google Drive folder with read-only access.\n\n1. Open the Google Cloud Console and select or create a project.\n2. Enable the **Google Drive API** for that project.\n3. Under **IAM & Admin > Service accounts**, create a service account without roles and add a **JSON key**. Never paste this JSON in a chat or issue.\n4. Copy the service account email (ends with `iam.gserviceaccount.com`).\n5. In Google Drive on the web, share the folder with that email as **Viewer**.\n6. Copy the folder ID from the URL: `drive.google.com/drive/folders/<ID>`.\n7. Paste the JSON and the folder ID (or the full folder URL) below. When reconfiguring, leave the JSON empty to keep the stored key.\n\nFull guide and troubleshooting: {setup_url}",
+        "description": "Filament Stock reads your sliced plates (`*.gcode.3mf`) from a Google Drive folder, read-only. You need two things: a **JSON key** of a Google service account and the **folder ID**.\n\n**JSON key**\n1. [Create a Google Cloud project]({project_url}) (or pick an existing one).\n2. [Enable the Google Drive API]({api_url}) for that project.\n3. Open [Service accounts]({accounts_url}) and click **Create service account**. A name is enough, skip the roles.\n4. Open the new account, tab **Keys**, then **Add key > Create new key > JSON**. Your browser downloads a `.json` file.\n5. Open that file in a text editor (Notepad, TextEdit), select all and paste it below. Never paste it in a chat or issue.\n\n**Folder ID**\n6. Copy the service account email from the JSON file (`client_email`, ends with `iam.gserviceaccount.com`).\n7. In [Google Drive]({drive_url}) on the web, right-click the folder with your plates, choose **Share** and add that email as **Viewer**.\n8. Open the folder. The address bar shows `drive.google.com/drive/folders/<ID>`. Paste the whole address or only the ID below.\n\nFull guide and troubleshooting: {setup_url}",
         "data": {
           "service_account": "Service account JSON key",
           "folder_id": "Folder ID or folder URL"
         },
         "data_description": {
-          "service_account": "The complete contents of the JSON key file.",
-          "folder_id": "The folder that holds your sliced plates."
+          "service_account": "The full contents of the downloaded `.json` key file, including the first and last curly bracket. When reconfiguring, leave empty to keep the stored key.",
+          "folder_id": "The address of the Drive folder from your browser, or only the part after `/folders/`."
         }
       },
       "reconfigure": {

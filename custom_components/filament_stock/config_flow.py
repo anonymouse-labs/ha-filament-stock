@@ -68,6 +68,15 @@ _DRIVE_FIELD_ERRORS = {
     "not_a_folder": CONF_FOLDER_ID,
 }
 
+# Links shown in the Drive step. Kept out of the translations on purpose.
+DRIVE_LINKS = {
+    "setup_url": DRIVE_SETUP_URL,
+    "project_url": "https://console.cloud.google.com/projectcreate",
+    "api_url": "https://console.cloud.google.com/apis/library/drive.googleapis.com",
+    "accounts_url": "https://console.cloud.google.com/iam-admin/serviceaccounts",
+    "drive_url": "https://drive.google.com/drive/my-drive",
+}
+
 CODE_SCHEMA = probatio.Schema({probatio.Required(CONF_CODE): TextSelector()})
 
 
@@ -220,7 +229,7 @@ class FilamentStockConfigFlow(ConfigFlow, domain=DOMAIN):
         """Service account JSON and the shared folder."""
         reconfigure = self.source == SOURCE_RECONFIGURE
         errors: dict[str, str] = {}
-        placeholders = {"setup_url": DRIVE_SETUP_URL, "email": "-"}
+        placeholders = {**DRIVE_LINKS, "email": "-"}
         if user_input is not None:
             service_account = (user_input.get(CONF_SERVICE_ACCOUNT) or "").strip()
             if reconfigure and not service_account:
