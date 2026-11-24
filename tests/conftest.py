@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 from collections.abc import Callable, Generator
 import json
@@ -16,7 +17,7 @@ from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.filament_stock.bambu_api import Response
+from custom_components.filament_stock.bambu_api import FILAMENT_PATH, Response
 from custom_components.filament_stock.const import (
     CONF_ACCOUNT,
     CONF_FOLDER_ID,
@@ -25,6 +26,7 @@ from custom_components.filament_stock.const import (
     CONF_TOKEN_EXPIRES,
     DOMAIN,
 )
+from custom_components.filament_stock.drive import DriveFile
 
 FOLDER_ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz012345"
 SA_EMAIL = "reader@example-project.iam.gserviceaccount.com"
@@ -81,6 +83,8 @@ class FakeTransport:
         }
         self.calls.append(call)
         queue = self.routes.get((method, path))
+        if not queue and (method, path) == ("GET", FILAMENT_PATH):
+            return Response(200, '{"total": 0, "hits": []}')
         if not queue:
             raise AssertionError(f"no fake route for {method} {path}")
         handler = queue.pop(0) if len(queue) > 1 else queue[0]
@@ -174,3 +178,55 @@ def no_backoff() -> Generator[None]:
     """Do not sleep between retries."""
     with patch("custom_components.filament_stock.drive.asyncio.sleep"):
         yield
+
+
+class FakeDrive:
+    """Stand-in for the Drive API calls."""
+
+    def __init__(self) -> None:
+        self.listing: list[DriveFile] = []
+        self.content: dict[str, bytes | Exception] = {}
+        self.folder_error: Exception | None = None
+        self.downloads: list[str] = []
+        self.gate: asyncio.Event | None = None
+
+    async def get_folder(self, folder_id: str) -> str:
+        if self.folder_error:
+            raise self.folder_error
+        return "Print queue"
+
+    async def list_folder(self, folder_id: str) -> list[DriveFile]:
+        return list(self.listing)
+
+    async def download(self, file_id: str, limit: int = 0) -> bytes:
+        self.downloads.append(file_id)
+        if self.gate is not None:
+            await self.gate.wait()
+        value = self.content[file_id]
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    def add(self, file_id: str, name: str, data: bytes | Exception, stamp: str = "1"):
+        self.listing.append(DriveFile(file_id, name, stamp, None))
+        self.content[file_id] = data
+
+
+@pytest.fixture
+def drive(bambu: FakeTransport) -> Generator[FakeDrive]:
+    fake = FakeDrive()
+    with (
+        patch(
+            "custom_components.filament_stock.drive.DriveClient.get_folder",
+            side_effect=fake.get_folder,
+        ),
+        patch(
+            "custom_components.filament_stock.drive.DriveClient.list_folder",
+            side_effect=fake.list_folder,
+        ),
+        patch(
+            "custom_components.filament_stock.drive.DriveClient.download",
+            side_effect=fake.download,
+        ),
+    ):
+        yield fake

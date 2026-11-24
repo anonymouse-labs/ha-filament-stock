@@ -1,0 +1,39 @@
+refresh:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: filament_stock
+
+map_color:
+  fields:
+    material:
+      required: true
+      example: PLA
+      selector:
+        text:
+    color:
+      required: true
+      example: "#101410"
+      selector:
+        text:
+    group:
+      selector:
+        entity:
+          integration: filament_stock
+          domain: sensor
+
+reset_ledger:
+  fields:
+    group:
+      required: true
+      selector:
+        entity:
+          integration: filament_stock
+          domain: sensor
+    spool_id:
+      selector:
+        number:
+          min: 1
+          max: 9223372036854775807
+          mode: box

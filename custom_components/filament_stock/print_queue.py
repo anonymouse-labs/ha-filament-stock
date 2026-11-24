@@ -173,6 +173,10 @@ class QueueCoordinator(DataUpdateCoordinator[QueueData]):
             },
         }
 
+    async def async_flush(self) -> None:
+        """Write the cache and the known files now, before an unload."""
+        await self._store.async_save(self._to_store())
+
     async def _fetch(self, item: DriveFile, old: QueueFile | None) -> QueueFile:
         """Download and parse one file. Never raises."""
         result = QueueFile(item.id, item.name, item.stamp)

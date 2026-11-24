@@ -87,9 +87,17 @@ class SpoolCoordinator(DataUpdateCoordinator[SpoolData]):
             ) from err
         except BambuError as err:
             raise UpdateFailed(f"Bambu cloud error: {err.key}") from err
+        if not raw and self.data is not None and self.data.raw:
+            # One empty answer must not wipe the ledger and every entity.
+            raise UpdateFailed("Bambu cloud returned an empty spool list")
         self.check_token_expiry()
         self._store.async_delay_save(lambda: {"raw": raw}, 2)
         return SpoolData.from_raw(raw)
+
+    async def async_flush(self) -> None:
+        """Write the last list now, before an unload."""
+        if self.data is not None and self.data.raw:
+            await self._store.async_save({"raw": self.data.raw})
 
     def check_token_expiry(self) -> None:
         """Warn in Repairs before the cloud token expires."""

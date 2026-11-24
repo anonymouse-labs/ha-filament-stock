@@ -72,7 +72,13 @@
         "title": "Filament Stock options",
         "data": {
           "spool_interval": "Check the Bambu Lab cloud every",
-          "queue_interval": "Check the Drive folder every"
+          "queue_interval": "Check the Drive folder every",
+          "match_nearest": "Match a file color to the nearest spool color",
+          "match_distance": "Maximum color distance (CIEDE2000)"
+        },
+        "data_description": {
+          "match_nearest": "When a file color has no spool with exactly the same color and material, use the closest one.",
+          "match_distance": "Lower is stricter. About 2 is barely visible, 10 is a clearly similar shade."
         }
       }
     }
@@ -89,6 +95,93 @@
     },
     "token_rejected": {
       "message": "The Bambu Lab cloud rejected the sign-in token. Sign in again."
+    },
+    "not_a_group": {
+      "message": "{entity_id} is not a color group sensor of Filament Stock."
+    },
+    "entry_not_loaded": {
+      "message": "This Filament Stock entry is not loaded."
+    },
+    "invalid_color": {
+      "message": "The color must look like #RRGGBB."
+    },
+    "unknown_group_target": {
+      "message": "Choose a color group with spools, not an unknown color."
+    },
+    "spool_not_in_group": {
+      "message": "This spool is not part of the chosen color group."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "stock": {
+        "name": "{group} stock"
+      },
+      "needed": {
+        "name": "{group} needed"
+      },
+      "balance": {
+        "name": "{group} balance"
+      },
+      "queue_plates": {
+        "name": "Plates in queue"
+      },
+      "total_needed": {
+        "name": "Total needed"
+      },
+      "total_stock": {
+        "name": "Total stock"
+      },
+      "not_sliced": {
+        "name": "Not sliced"
+      },
+      "unmatched_colors": {
+        "name": "Unmatched colors"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Refresh",
+      "description": "Read the Bambu Lab cloud and the Drive folder now.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration entry",
+          "description": "Only this entry. Leave empty for all."
+        }
+      }
+    },
+    "map_color": {
+      "name": "Map file color",
+      "description": "Always count a color from the sliced files against a chosen color group. Leave the group empty to remove the mapping.",
+      "fields": {
+        "material": {
+          "name": "Material",
+          "description": "Material as in the sliced file, for example PLA."
+        },
+        "color": {
+          "name": "Color",
+          "description": "Hex color as in the sliced file, #RRGGBB."
+        },
+        "group": {
+          "name": "Color group",
+          "description": "Any stock, needed or balance sensor of the target color group."
+        }
+      }
+    },
+    "reset_ledger": {
+      "name": "Reset local usage",
+      "description": "Forget the usage booked locally since the last cloud weight, for one spool or a whole color group. Also clears a shortage of the group.",
+      "fields": {
+        "group": {
+          "name": "Color group",
+          "description": "Any stock, needed or balance sensor of the color group."
+        },
+        "spool_id": {
+          "name": "Spool ID",
+          "description": "Only this spool. Spool IDs are in the spools attribute of the stock sensor."
+        }
+      }
     }
   }
 }

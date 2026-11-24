@@ -22,6 +22,7 @@ from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -42,11 +43,14 @@ from .bambu_api import (
 from .const import (
     CONF_ACCOUNT,
     CONF_FOLDER_ID,
+    CONF_MATCH_DISTANCE,
+    CONF_MATCH_NEAREST,
     CONF_QUEUE_INTERVAL,
     CONF_SERVICE_ACCOUNT,
     CONF_SPOOL_INTERVAL,
     CONF_TOKEN,
     CONF_TOKEN_EXPIRES,
+    DEFAULT_MATCH_DISTANCE,
     DEFAULT_QUEUE_INTERVAL,
     DEFAULT_SPOOL_INTERVAL,
     DOMAIN,
@@ -317,6 +321,8 @@ class FilamentStockOptionsFlow(OptionsFlowWithReload):
                     **self.config_entry.options,
                     CONF_SPOOL_INTERVAL: int(user_input[CONF_SPOOL_INTERVAL]),
                     CONF_QUEUE_INTERVAL: int(user_input[CONF_QUEUE_INTERVAL]),
+                    CONF_MATCH_NEAREST: bool(user_input[CONF_MATCH_NEAREST]),
+                    CONF_MATCH_DISTANCE: float(user_input[CONF_MATCH_DISTANCE]),
                 }
             )
         options = self.config_entry.options
@@ -330,6 +336,17 @@ class FilamentStockOptionsFlow(OptionsFlowWithReload):
                     CONF_QUEUE_INTERVAL,
                     default=options.get(CONF_QUEUE_INTERVAL, DEFAULT_QUEUE_INTERVAL),
                 ): _minutes(1440),
+                probatio.Required(
+                    CONF_MATCH_NEAREST, default=options.get(CONF_MATCH_NEAREST, True)
+                ): BooleanSelector(),
+                probatio.Required(
+                    CONF_MATCH_DISTANCE,
+                    default=options.get(CONF_MATCH_DISTANCE, DEFAULT_MATCH_DISTANCE),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=1, max=50, step=0.5, mode=NumberSelectorMode.SLIDER
+                    )
+                ),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

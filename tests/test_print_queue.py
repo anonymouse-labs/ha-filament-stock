@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Generator
 from datetime import timedelta
 from typing import Any
-from unittest.mock import patch
 
-from conftest import FOLDER_ID, FakeTransport
+from conftest import FOLDER_ID, FakeDrive, FakeTransport
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -19,7 +17,6 @@ from pytest_homeassistant_custom_component.common import (
 )
 from threemf import REFERENCE_PLATE, build_3mf, slice_info
 
-from custom_components.filament_stock.bambu_api import FILAMENT_PATH
 from custom_components.filament_stock.const import (
     CONF_FOLDER_ID,
     CONF_SERVICE_ACCOUNT,
@@ -37,59 +34,6 @@ from custom_components.filament_stock.parser import ParseStatus
 SLICED = build_3mf(slice_info([REFERENCE_PLATE]))
 PROJECT = build_3mf(None)
 PLATE_NAME = "12 Gear BOX spare links v2.gcode.3mf"
-
-
-class FakeDrive:
-    """Stand-in for the Drive API calls."""
-
-    def __init__(self) -> None:
-        self.listing: list[DriveFile] = []
-        self.content: dict[str, bytes | Exception] = {}
-        self.folder_error: Exception | None = None
-        self.downloads: list[str] = []
-        self.gate: asyncio.Event | None = None
-
-    async def get_folder(self, folder_id: str) -> str:
-        if self.folder_error:
-            raise self.folder_error
-        return "Print queue"
-
-    async def list_folder(self, folder_id: str) -> list[DriveFile]:
-        return list(self.listing)
-
-    async def download(self, file_id: str, limit: int = 0) -> bytes:
-        self.downloads.append(file_id)
-        if self.gate is not None:
-            await self.gate.wait()
-        value = self.content[file_id]
-        if isinstance(value, Exception):
-            raise value
-        return value
-
-    def add(self, file_id: str, name: str, data: bytes | Exception, stamp: str = "1"):
-        self.listing.append(DriveFile(file_id, name, stamp, None))
-        self.content[file_id] = data
-
-
-@pytest.fixture
-def drive(bambu: FakeTransport) -> Generator[FakeDrive]:
-    bambu.json("GET", FILAMENT_PATH, {"total": 0, "hits": []})
-    fake = FakeDrive()
-    with (
-        patch(
-            "custom_components.filament_stock.drive.DriveClient.get_folder",
-            side_effect=fake.get_folder,
-        ),
-        patch(
-            "custom_components.filament_stock.drive.DriveClient.list_folder",
-            side_effect=fake.list_folder,
-        ),
-        patch(
-            "custom_components.filament_stock.drive.DriveClient.download",
-            side_effect=fake.download,
-        ),
-    ):
-        yield fake
 
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> Any:

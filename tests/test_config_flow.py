@@ -45,9 +45,12 @@ OTHER_FOLDER = "9ZyXwVuTsRqPoNmLkJiHgFeDcBa98765"
 
 @pytest.fixture(autouse=True)
 def no_setup():
-    with patch(
-        "custom_components.filament_stock.async_setup_entry", return_value=True
-    ) as setup:
+    with (
+        patch(
+            "custom_components.filament_stock.async_setup_entry", return_value=True
+        ) as setup,
+        patch("custom_components.filament_stock.async_unload_entry", return_value=True),
+    ):
         yield setup
 
 
@@ -301,11 +304,22 @@ async def test_options_flow_reloads(
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_SPOOL_INTERVAL: 20, CONF_QUEUE_INTERVAL: 30}
+        result["flow_id"],
+        {
+            CONF_SPOOL_INTERVAL: 20,
+            CONF_QUEUE_INTERVAL: 30,
+            "match_nearest": False,
+            "match_distance": 5,
+        },
     )
     await hass.async_block_till_done()
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options == {CONF_SPOOL_INTERVAL: 20, CONF_QUEUE_INTERVAL: 30}
+    assert entry.options == {
+        CONF_SPOOL_INTERVAL: 20,
+        CONF_QUEUE_INTERVAL: 30,
+        "match_nearest": False,
+        "match_distance": 5.0,
+    }
     assert no_setup.call_count == calls + 1
 
 

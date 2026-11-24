@@ -1,0 +1,384 @@
+"""Tests for the sensors, the stock manager and the actions."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from conftest import FakeDrive, FakeTransport
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import entity_registry as er
+import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+from threemf import REFERENCE_PLATE, build_3mf, slice_info
+
+from custom_components.filament_stock.bambu_api import FILAMENT_PATH, Response
+from custom_components.filament_stock.const import DOMAIN
+from custom_components.filament_stock.models import GroupKey
+
+BLACK = {
+    "id": 1,
+    "color": "#000000FF",
+    "filamentType": "PLA",
+    "netWeight": 1000,
+    "totalNetWeight": 1000,
+    "filamentName": "PLA Basic",
+}
+GREY = {
+    "id": 2,
+    "color": "#898989FF",
+    "filamentType": "PLA",
+    "netWeight": 800,
+    "totalNetWeight": 1000,
+}
+GREEN_MAT = {
+    "id": 3,
+    "color": "#006633FF",
+    "filamentType": "PLA",
+    "note": "mat",
+    "netWeight": 500,
+    "totalNetWeight": 1000,
+}
+GREEN_GLOSS = {
+    "id": 4,
+    "color": "#006633FF",
+    "filamentType": "PLA",
+    "note": "hoogglans",
+    "netWeight": 300,
+    "totalNetWeight": 1000,
+}
+
+UNKNOWN = "unknown_petg_ff0000"
+
+
+def _spools(bambu: FakeTransport, *hits: dict[str, Any]) -> None:
+    bambu.routes.pop(("GET", FILAMENT_PATH), None)
+    bambu.json("GET", FILAMENT_PATH, {"total": len(hits), "hits": list(hits)})
+
+
+async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+
+def _entity(hass: HomeAssistant, entry: MockConfigEntry, key: str) -> str | None:
+    return er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_{key}"
+    )
+
+
+def _value(hass: HomeAssistant, entry: MockConfigEntry, key: str) -> float:
+    entity_id = _entity(hass, entry, key)
+    assert entity_id, key
+    return float(hass.states.get(entity_id).state)
+
+
+@pytest.fixture
+def plate(drive: FakeDrive) -> FakeDrive:
+    drive.add("f1", "plate.gcode.3mf", build_3mf(slice_info([REFERENCE_PLATE])))
+    return drive
+
+
+async def test_reference_plate_balance(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, plate: FakeDrive
+) -> None:
+    _spools(bambu, BLACK, GREY)
+    await _setup(hass, entry)
+
+    # #101410 has no exact spool: nearest is black. #898989 is exact.
+    assert _value(hass, entry, "pla_000000_stock") == 1000
+    assert _value(hass, entry, "pla_000000_needed") == pytest.approx(15.0)
+    assert _value(hass, entry, "pla_000000_balance") == pytest.approx(985.0)
+    assert _value(hass, entry, "pla_898989_balance") == pytest.approx(788.9)
+    assert _value(hass, entry, "total_needed") == pytest.approx(26.1)
+    assert _value(hass, entry, "total_stock") == 1800
+    assert _value(hass, entry, "queue_plates") == 1
+    assert _value(hass, entry, "unmatched_colors") == 0
+
+    state = hass.states.get(_entity(hass, entry, "pla_000000_balance"))
+    assert state.attributes["material"] == "PLA"
+    assert state.attributes["color"] == "#000000"
+    assert state.attributes["spools"][0]["name"] == "PLA Basic"
+    assert state.attributes["file_colors"][0]["method"] == "nearest"
+    assert state.attributes["unit_of_measurement"] == "g"
+    assert state.name == "Filament Stock PLA #000000 balance"
+
+
+async def test_notes_make_separate_groups(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    _spools(bambu, GREEN_MAT, GREEN_GLOSS)
+    await _setup(hass, entry)
+    mat = GroupKey.of("PLA", "#006633", "mat").id
+    gloss = GroupKey.of("PLA", "#006633", "hoogglans").id
+    assert _value(hass, entry, f"{mat}_balance") == 500
+    assert _value(hass, entry, f"{gloss}_balance") == 300
+    state = hass.states.get(_entity(hass, entry, f"{mat}_balance"))
+    assert state.attributes["note"] == "mat"
+    assert state.name == "Filament Stock PLA #006633 mat balance"
+
+
+async def test_unknown_color_goes_negative(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    drive.add(
+        "f1", "red.gcode.3mf", build_3mf(slice_info([[("PETG", "#FF0000", 7.5)]]))
+    )
+    _spools(bambu, BLACK)
+    await _setup(hass, entry)
+    assert _value(hass, entry, f"{UNKNOWN}_balance") == pytest.approx(-7.5)
+    assert _value(hass, entry, "unmatched_colors") == 1
+    state = hass.states.get(_entity(hass, entry, "unmatched_colors"))
+    assert state.attributes["colors"] == [{"material": "PETG", "color": "#FF0000"}]
+    unknown = hass.states.get(_entity(hass, entry, f"{UNKNOWN}_balance"))
+    assert unknown.attributes["unknown"] is True
+
+
+async def test_vanished_group_is_removed(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    _spools(bambu, BLACK, GREY)
+    await _setup(hass, entry)
+    assert _entity(hass, entry, "pla_898989_stock")
+
+    _spools(bambu, BLACK)
+    await entry.runtime_data.spools.async_refresh()
+    await hass.async_block_till_done()
+    assert _entity(hass, entry, "pla_898989_stock") is None
+    assert _entity(hass, entry, "pla_898989_balance") is None
+    assert _entity(hass, entry, "pla_000000_stock")
+
+
+async def test_new_group_appears(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    _spools(bambu, BLACK)
+    await _setup(hass, entry)
+    _spools(bambu, BLACK, GREY)
+    await entry.runtime_data.spools.async_refresh()
+    await hass.async_block_till_done()
+    assert _value(hass, entry, "pla_898989_stock") == 800
+    assert entry.runtime_data.manager.last_sync.new == [2]
+
+
+async def test_failed_refresh_keeps_values(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    _spools(bambu, BLACK)
+    await _setup(hass, entry)
+    bambu.routes[("GET", FILAMENT_PATH)] = [Response(503, "down")]
+    await entry.runtime_data.spools.async_refresh()
+    await hass.async_block_till_done()
+    assert _value(hass, entry, "pla_000000_stock") == 1000
+
+
+async def test_nearest_can_be_disabled(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, plate: FakeDrive
+) -> None:
+    hass.config_entries.async_update_entry(entry, options={"match_nearest": False})
+    _spools(bambu, BLACK, GREY)
+    await _setup(hass, entry)
+    assert _value(hass, entry, "unmatched_colors") == 1
+    assert _value(hass, entry, "unknown_pla_101410_balance") == pytest.approx(-15.0)
+    assert _value(hass, entry, "pla_000000_needed") == 0
+
+
+async def test_map_color_action(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    bambu: FakeTransport,
+    plate: FakeDrive,
+    hass_storage: dict[str, Any],
+) -> None:
+    _spools(bambu, BLACK, GREY)
+    await _setup(hass, entry)
+    grey_balance = _entity(hass, entry, "pla_898989_balance")
+    await hass.services.async_call(
+        DOMAIN,
+        "map_color",
+        {"material": "PLA", "color": "#101410", "group": grey_balance},
+        blocking=True,
+    )
+    assert _value(hass, entry, "pla_000000_needed") == 0
+    assert _value(hass, entry, "pla_898989_needed") == pytest.approx(26.1)
+
+    # Without a group the mapping is removed.
+    await hass.services.async_call(
+        DOMAIN, "map_color", {"material": "PLA", "color": "#101410"}, blocking=True
+    )
+    assert _value(hass, entry, "pla_000000_needed") == pytest.approx(15.0)
+
+
+@pytest.mark.parametrize(
+    ("data", "key"),
+    [
+        ({"material": "PLA", "color": "black"}, "invalid_color"),
+        (
+            {"material": "PLA", "color": "#101410", "group": "sensor.nope"},
+            "not_a_group",
+        ),
+    ],
+)
+async def test_map_color_errors(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    bambu: FakeTransport,
+    drive: FakeDrive,
+    data: dict[str, str],
+    key: str,
+) -> None:
+    await _setup(hass, entry)
+    with pytest.raises(ServiceValidationError) as info:
+        await hass.services.async_call(DOMAIN, "map_color", data, blocking=True)
+    assert info.value.translation_key == key
+
+
+async def test_map_color_to_unknown_group_is_refused(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    drive.add("f1", "red.gcode.3mf", build_3mf(slice_info([[("PETG", "#FF0000", 1)]])))
+    await _setup(hass, entry)
+    with pytest.raises(ServiceValidationError) as info:
+        await hass.services.async_call(
+            DOMAIN,
+            "map_color",
+            {
+                "material": "PLA",
+                "color": "#101410",
+                "group": _entity(hass, entry, f"{UNKNOWN}_balance"),
+            },
+            blocking=True,
+        )
+    assert info.value.translation_key == "unknown_group_target"
+
+
+async def test_reset_ledger_action(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    _spools(bambu, BLACK)
+    await _setup(hass, entry)
+    manager = entry.runtime_data.manager
+    manager.ledger.deduct("job-1", {"pla_000000": 1100}, manager.spools.data.groups)
+    manager.async_update()
+    assert _value(hass, entry, "pla_000000_stock") == -100
+
+    stock = _entity(hass, entry, "pla_000000_stock")
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, "reset_ledger", {"group": stock, "spool_id": 99}, blocking=True
+        )
+    await hass.services.async_call(
+        DOMAIN, "reset_ledger", {"group": stock, "spool_id": 1}, blocking=True
+    )
+    assert _value(hass, entry, "pla_000000_stock") == 900  # shortage stays
+    await hass.services.async_call(
+        DOMAIN, "reset_ledger", {"group": stock}, blocking=True
+    )
+    assert _value(hass, entry, "pla_000000_stock") == 1000
+
+
+async def test_refresh_action(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    await _setup(hass, entry)
+    before = len(bambu.calls)
+    await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+    assert len(bambu.calls) == before + 1
+    await hass.services.async_call(
+        DOMAIN, "refresh", {"config_entry_id": entry.entry_id}, blocking=True
+    )
+    assert len(bambu.calls) == before + 2
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, "refresh", {"config_entry_id": "nope"}, blocking=True
+        )
+
+
+async def test_ledger_survives_restart(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    _spools(bambu, BLACK)
+    await _setup(hass, entry)
+    manager = entry.runtime_data.manager
+    manager.ledger.deduct("job-1", {"pla_000000": 100}, manager.spools.data.groups)
+    manager.async_save()
+    manager.async_update()
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await _setup(hass, entry)
+    assert _value(hass, entry, "pla_000000_stock") == 900
+    assert "job-1" in entry.runtime_data.manager.ledger.applied
+
+
+def _stale_entity(hass: HomeAssistant, entry: MockConfigEntry) -> str:
+    return (
+        er.async_get(hass)
+        .async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{entry.entry_id}_pla_123456_balance",
+            config_entry=entry,
+            translation_key="balance",
+        )
+        .entity_id
+    )
+
+
+async def test_group_gone_while_offline_is_removed(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    stale = _stale_entity(hass, entry)
+    _spools(bambu, BLACK)
+    await _setup(hass, entry)
+    assert er.async_get(hass).async_get(stale) is None
+    assert _entity(hass, entry, "pla_000000_balance")
+
+
+async def test_no_cleanup_without_real_data(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    stale = _stale_entity(hass, entry)
+    bambu.routes[("GET", FILAMENT_PATH)] = [Response(503, "down")]
+    await _setup(hass, entry)
+    assert er.async_get(hass).async_get(stale) is not None
+
+
+async def test_shortage_survives_start_without_spool_cache(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    bambu: FakeTransport,
+    drive: FakeDrive,
+    hass_storage: dict[str, Any],
+) -> None:
+    hass_storage[f"{DOMAIN}.{entry.entry_id}.stock"] = {
+        "version": 1,
+        "key": f"{DOMAIN}.{entry.entry_id}.stock",
+        "data": {
+            "ledger": {
+                "spools": {"1": [1000, 0]},
+                "shortage": {"pla_000000": 25.0},
+                "applied": ["job-1"],
+                "synced": True,
+            }
+        },
+    }
+    bambu.routes[("GET", FILAMENT_PATH)] = [Response(503, "down")]
+    await _setup(hass, entry)
+    assert entry.runtime_data.manager.ledger.shortage == {"pla_000000": 25.0}
+
+
+async def test_empty_cloud_list_is_ignored(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    _spools(bambu, BLACK)
+    await _setup(hass, entry)
+    manager = entry.runtime_data.manager
+    manager.ledger.deduct("job-1", {"pla_000000": 100}, manager.spools.data.groups)
+
+    _spools(bambu)
+    await entry.runtime_data.spools.async_refresh()
+    await hass.async_block_till_done()
+    assert not entry.runtime_data.spools.last_update_success
+    assert manager.ledger.remaining(1) == 900
+    assert _value(hass, entry, "pla_000000_stock") == 900

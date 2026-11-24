@@ -72,7 +72,13 @@
         "title": "Opties Filament Stock",
         "data": {
           "spool_interval": "Bambu Lab-cloud controleren elke",
-          "queue_interval": "Drive-map controleren elke"
+          "queue_interval": "Drive-map controleren elke",
+          "match_nearest": "Bestandskleur koppelen aan de dichtstbijzijnde spoelkleur",
+          "match_distance": "Maximale kleurafstand (CIEDE2000)"
+        },
+        "data_description": {
+          "match_nearest": "Heeft een bestandskleur geen spoel met precies dezelfde kleur en hetzelfde materiaal, gebruik dan de dichtstbijzijnde.",
+          "match_distance": "Lager is strenger. Rond 2 is nauwelijks zichtbaar, 10 is een duidelijk vergelijkbare tint."
         }
       }
     }
@@ -89,6 +95,93 @@
     },
     "token_rejected": {
       "message": "De Bambu Lab-cloud heeft het inlogtoken geweigerd. Log opnieuw in."
+    },
+    "not_a_group": {
+      "message": "{entity_id} is geen kleurgroepsensor van Filament Stock."
+    },
+    "entry_not_loaded": {
+      "message": "Dit Filament Stock-item is niet geladen."
+    },
+    "invalid_color": {
+      "message": "De kleur moet er uitzien als #RRGGBB."
+    },
+    "unknown_group_target": {
+      "message": "Kies een kleurgroep met spoelen, geen onbekende kleur."
+    },
+    "spool_not_in_group": {
+      "message": "Deze spoel hoort niet bij de gekozen kleurgroep."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "stock": {
+        "name": "{group} voorraad"
+      },
+      "needed": {
+        "name": "{group} nodig"
+      },
+      "balance": {
+        "name": "{group} saldo"
+      },
+      "queue_plates": {
+        "name": "Platen in wachtrij"
+      },
+      "total_needed": {
+        "name": "Totaal nodig"
+      },
+      "total_stock": {
+        "name": "Totale voorraad"
+      },
+      "not_sliced": {
+        "name": "Niet gesliceerd"
+      },
+      "unmatched_colors": {
+        "name": "Niet gekoppelde kleuren"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Verversen",
+      "description": "Lees de Bambu Lab-cloud en de Drive-map nu.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integratie-item",
+          "description": "Alleen dit item. Leeg laten voor alle."
+        }
+      }
+    },
+    "map_color": {
+      "name": "Bestandskleur koppelen",
+      "description": "Tel een kleur uit de gesliceerde bestanden altijd bij een gekozen kleurgroep. Laat de groep leeg om de koppeling te verwijderen.",
+      "fields": {
+        "material": {
+          "name": "Materiaal",
+          "description": "Materiaal zoals in het gesliceerde bestand, bijvoorbeeld PLA."
+        },
+        "color": {
+          "name": "Kleur",
+          "description": "Hexkleur zoals in het gesliceerde bestand, #RRGGBB."
+        },
+        "group": {
+          "name": "Kleurgroep",
+          "description": "Een voorraad-, nodig- of saldosensor van de gewenste kleurgroep."
+        }
+      }
+    },
+    "reset_ledger": {
+      "name": "Lokaal verbruik wissen",
+      "description": "Vergeet het lokaal geboekte verbruik sinds het laatste cloudgewicht, voor één spoel of een hele kleurgroep. Wist ook een tekort van de groep.",
+      "fields": {
+        "group": {
+          "name": "Kleurgroep",
+          "description": "Een voorraad-, nodig- of saldosensor van de kleurgroep."
+        },
+        "spool_id": {
+          "name": "Spoel-ID",
+          "description": "Alleen deze spoel. Spoel-ID's staan in het attribuut spools van de voorraadsensor."
+        }
+      }
     }
   }
 }
