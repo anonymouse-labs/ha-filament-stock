@@ -20,3 +20,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Sensors per color group (stock, needed, balance) and for queue totals, added and removed with the groups.
 - Actions `refresh`, `map_color` and `reset_ledger`; options for nearest color matching.
 - Print tracking via ha-bambulab: the file and grams per color are stored at print start; finish books 100 %, failed books the progress reached, each print is booked once. Last deduction sensor.
+- Notifications for new spools, negative or low balance, unsliced files and token expiry; via WhatsApp Notifier, any notify entity or a persistent notification. Each event once, combined and rate limited.
+- Repair issues for unsliced files and file colors without a spool.

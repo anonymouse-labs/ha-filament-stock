@@ -23,9 +23,14 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -45,6 +50,14 @@ from .const import (
     CONF_FOLDER_ID,
     CONF_MATCH_DISTANCE,
     CONF_MATCH_NEAREST,
+    CONF_NOTIFY_CHAT_ID,
+    CONF_NOTIFY_ENTITY,
+    CONF_NOTIFY_LOW,
+    CONF_NOTIFY_METHOD,
+    CONF_NOTIFY_NEGATIVE,
+    CONF_NOTIFY_NEW_SPOOL,
+    CONF_NOTIFY_NOT_SLICED,
+    CONF_NOTIFY_TOKEN,
     CONF_QUEUE_INTERVAL,
     CONF_SERVICE_ACCOUNT,
     CONF_SPOOL_INTERVAL,
@@ -55,6 +68,11 @@ from .const import (
     DEFAULT_SPOOL_INTERVAL,
     DOMAIN,
     DRIVE_SETUP_URL,
+    METHOD_NOTIFY_ENTITY,
+    METHOD_PERSISTENT,
+    METHOD_WHATSAPP,
+    WHATSAPP_DOMAIN,
+    WHATSAPP_URL,
 )
 from .drive import (
     DriveClient,
@@ -310,21 +328,23 @@ def _minutes(maximum: int) -> NumberSelector:
 
 
 class FilamentStockOptionsFlow(OptionsFlowWithReload):
-    """Polling intervals."""
+    """Polling, matching, then notifications."""
+
+    def __init__(self) -> None:
+        self._options: dict[str, Any] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(
-                data={
-                    **self.config_entry.options,
-                    CONF_SPOOL_INTERVAL: int(user_input[CONF_SPOOL_INTERVAL]),
-                    CONF_QUEUE_INTERVAL: int(user_input[CONF_QUEUE_INTERVAL]),
-                    CONF_MATCH_NEAREST: bool(user_input[CONF_MATCH_NEAREST]),
-                    CONF_MATCH_DISTANCE: float(user_input[CONF_MATCH_DISTANCE]),
-                }
-            )
+            self._options = {
+                **self.config_entry.options,
+                CONF_SPOOL_INTERVAL: int(user_input[CONF_SPOOL_INTERVAL]),
+                CONF_QUEUE_INTERVAL: int(user_input[CONF_QUEUE_INTERVAL]),
+                CONF_MATCH_NEAREST: bool(user_input[CONF_MATCH_NEAREST]),
+                CONF_MATCH_DISTANCE: float(user_input[CONF_MATCH_DISTANCE]),
+            }
+            return await self.async_step_notify()
         options = self.config_entry.options
         schema = probatio.Schema(
             {
@@ -350,3 +370,80 @@ class FilamentStockOptionsFlow(OptionsFlowWithReload):
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
+
+    async def async_step_notify(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """How and when to notify. WhatsApp Notifier is offered when loaded."""
+        whatsapp = WHATSAPP_DOMAIN in self.hass.config.components
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            method = user_input[CONF_NOTIFY_METHOD]
+            if method == METHOD_NOTIFY_ENTITY and not user_input.get(
+                CONF_NOTIFY_ENTITY
+            ):
+                errors[CONF_NOTIFY_ENTITY] = "notify_entity_required"
+            elif method == METHOD_WHATSAPP and not whatsapp:
+                errors[CONF_NOTIFY_METHOD] = "whatsapp_not_loaded"
+            else:
+                options = {**self._options, **user_input}
+                for key in (CONF_NOTIFY_ENTITY, CONF_NOTIFY_CHAT_ID):
+                    if not user_input.get(key):
+                        options.pop(key, None)
+                options[CONF_NOTIFY_LOW] = float(user_input[CONF_NOTIFY_LOW])
+                return self.async_create_entry(data=options)
+
+        current = {**self.config_entry.options, **(user_input or {})}
+        methods = [METHOD_PERSISTENT, METHOD_NOTIFY_ENTITY]
+        if whatsapp or current.get(CONF_NOTIFY_METHOD) == METHOD_WHATSAPP:
+            methods.insert(0, METHOD_WHATSAPP)
+        schema = probatio.Schema(
+            {
+                probatio.Required(
+                    CONF_NOTIFY_METHOD,
+                    default=current.get(CONF_NOTIFY_METHOD, METHOD_PERSISTENT),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=methods,
+                        translation_key="notify_method",
+                        mode=SelectSelectorMode.LIST,
+                    )
+                ),
+                probatio.Optional(CONF_NOTIFY_ENTITY): EntitySelector(
+                    EntitySelectorConfig(domain="notify")
+                ),
+                probatio.Optional(CONF_NOTIFY_CHAT_ID): TextSelector(),
+                probatio.Required(
+                    CONF_NOTIFY_NEW_SPOOL,
+                    default=current.get(CONF_NOTIFY_NEW_SPOOL, True),
+                ): BooleanSelector(),
+                probatio.Required(
+                    CONF_NOTIFY_NEGATIVE,
+                    default=current.get(CONF_NOTIFY_NEGATIVE, True),
+                ): BooleanSelector(),
+                probatio.Required(
+                    CONF_NOTIFY_LOW, default=current.get(CONF_NOTIFY_LOW, 0)
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0,
+                        max=5000,
+                        step=10,
+                        unit_of_measurement="g",
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
+                probatio.Required(
+                    CONF_NOTIFY_NOT_SLICED,
+                    default=current.get(CONF_NOTIFY_NOT_SLICED, True),
+                ): BooleanSelector(),
+                probatio.Required(
+                    CONF_NOTIFY_TOKEN, default=current.get(CONF_NOTIFY_TOKEN, True)
+                ): BooleanSelector(),
+            }
+        )
+        return self.async_show_form(
+            step_id="notify",
+            data_schema=self.add_suggested_values_to_schema(schema, current),
+            errors=errors,
+            description_placeholders={"whatsapp_url": WHATSAPP_URL},
+        )

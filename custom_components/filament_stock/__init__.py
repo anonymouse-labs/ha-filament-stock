@@ -15,6 +15,8 @@ from homeassistant.helpers.typing import ConfigType
 from .bambu_api import BambuCloudClient, CurlTransport
 from .const import CONF_SERVICE_ACCOUNT, CONF_TOKEN, DOMAIN
 from .drive import DriveClient, DriveError
+from .issues import async_track_issues
+from .notifier import Notifier
 from .print_queue import QueueCoordinator
 from .services import async_setup_services
 from .spools import SpoolCoordinator
@@ -34,6 +36,7 @@ class FilamentStockData:
     queue: QueueCoordinator
     manager: StockManager
     tracker: PrintTracker
+    notifier: Notifier
 
 
 type FilamentStockConfigEntry = ConfigEntry[FilamentStockData]
@@ -71,12 +74,23 @@ async def async_setup_entry(
     await manager.async_load()
     tracker = PrintTracker(hass, entry, manager)
     await tracker.async_load()
+    notifier = Notifier(hass, entry, manager)
+    await notifier.async_load()
     entry.runtime_data = FilamentStockData(
-        spools=spools, queue=queue, manager=manager, tracker=tracker
+        spools=spools,
+        queue=queue,
+        manager=manager,
+        tracker=tracker,
+        notifier=notifier,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    for unsub in [*manager.async_start(), *tracker.async_start()]:
+    for unsub in [
+        *manager.async_start(),
+        *tracker.async_start(),
+        *notifier.async_start(),
+        async_track_issues(hass, entry, manager),
+    ]:
         entry.async_on_unload(unsub)
 
     entry.async_create_background_task(
@@ -95,6 +109,7 @@ async def async_unload_entry(
     data = entry.runtime_data
     await data.manager.async_flush()
     await data.tracker.async_flush()
+    await data.notifier.async_flush_store()
     await data.spools.async_flush()
     await data.queue.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

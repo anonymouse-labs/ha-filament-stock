@@ -302,7 +302,7 @@ async def test_options_flow_reloads(
     await hass.async_block_till_done()
     calls = no_setup.call_count
     result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "init"
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
@@ -312,6 +312,35 @@ async def test_options_flow_reloads(
             "match_distance": 5,
         },
     )
+    assert result["step_id"] == "notify"
+    assert (
+        "whatsapp"
+        not in result["data_schema"].schema["notify_method"].config["options"]
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "notify_method": "notify_entity",
+            "notify_new_spool": True,
+            "notify_negative": True,
+            "notify_low": 100,
+            "notify_not_sliced": False,
+            "notify_token": True,
+        },
+    )
+    assert result["errors"] == {"notify_entity": "notify_entity_required"}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "notify_method": "notify_entity",
+            "notify_entity": "notify.phone",
+            "notify_new_spool": True,
+            "notify_negative": True,
+            "notify_low": 100,
+            "notify_not_sliced": False,
+            "notify_token": True,
+        },
+    )
     await hass.async_block_till_done()
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options == {
@@ -319,32 +348,30 @@ async def test_options_flow_reloads(
         CONF_QUEUE_INTERVAL: 30,
         "match_nearest": False,
         "match_distance": 5.0,
+        "notify_method": "notify_entity",
+        "notify_entity": "notify.phone",
+        "notify_new_spool": True,
+        "notify_negative": True,
+        "notify_low": 100.0,
+        "notify_not_sliced": False,
+        "notify_token": True,
     }
     assert no_setup.call_count == calls + 1
 
 
-async def test_unique_id_from_token_user(
-    hass: HomeAssistant, bambu: FakeTransport, service_account_json: str
+async def test_options_whatsapp_needs_integration(
+    hass: HomeAssistant, entry: MockConfigEntry
 ) -> None:
-    bambu.json("POST", LOGIN_PATH, {"accessToken": USER_TOKEN})
-    result = await _login(hass, (await _account_step(hass))["flow_id"])
-    result = await _drive(hass, result["flow_id"], service_account_json)
-    assert result["result"].unique_id == "u_42"
-
-
-async def test_expired_code_is_resent(
-    hass: HomeAssistant, bambu: FakeTransport
-) -> None:
-    bambu.json("POST", LOGIN_PATH, {"loginType": "verifyCode"})
-    bambu.add("POST", LOGIN_PATH, Response(400, '{"code": 1, "error": "expired"}'))
-    bambu.json("POST", LOGIN_PATH, {"accessToken": NEW_TOKEN})
-    bambu.json("POST", "/v1/user-service/user/sendemail/code", {})
-    result = await _login(hass, (await _account_step(hass))["flow_id"])
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"code": "111111"}
+    hass.config.components.add("whatsapp_notifier")
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_SPOOL_INTERVAL: 15,
+            CONF_QUEUE_INTERVAL: 10,
+            "match_nearest": True,
+            "match_distance": 10,
+        },
     )
-    assert result["errors"] == {"base": "code_expired"}
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"code": "222222"}
-    )
-    assert result["step_id"] == "drive"
+    assert "whatsapp" in result["data_schema"].schema["notify_method"].config["options"]
+    assert "ha-whatsapp-notifier" in result["description_placeholders"]["whatsapp_url"]

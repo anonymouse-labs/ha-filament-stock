@@ -80,13 +80,45 @@
           "match_nearest": "When a file color has no spool with exactly the same color and material, use the closest one.",
           "match_distance": "Lower is stricter. About 2 is barely visible, 10 is a clearly similar shade."
         }
+      },
+      "notify": {
+        "title": "Notifications",
+        "description": "Choose how Filament Stock tells you about new spools, low or negative balances, unsliced files and an expiring Bambu Lab sign-in.\n\n**Recommended: WhatsApp Notifier** ({whatsapp_url}). Free, sends WhatsApp messages straight from Home Assistant, no external server or paid API. Be aware that it relies on an unofficial WhatsApp protocol. Install it first, then pick it here.\n\nAny other `notify` entity works too. If sending fails, a persistent notification in Home Assistant is used.",
+        "data": {
+          "notify_method": "Send with",
+          "notify_entity": "Notify entity",
+          "notify_chat_id": "WhatsApp chat ID",
+          "notify_new_spool": "New spool found",
+          "notify_negative": "Balance below 0 g",
+          "notify_low": "Balance below (0 = off)",
+          "notify_not_sliced": "Unsliced file in the folder",
+          "notify_token": "Bambu Lab sign-in expires soon"
+        },
+        "data_description": {
+          "notify_entity": "Needed for 'Notify entity'. A WhatsApp Notifier chat is a notify entity too.",
+          "notify_chat_id": "Only for WhatsApp Notifier. Leave empty for its default chat.",
+          "notify_new_spool": "Includes a reminder to check the weight.",
+          "notify_low": "One message when a color group drops below this many grams."
+        }
       }
+    },
+    "error": {
+      "notify_entity_required": "Choose a notify entity.",
+      "whatsapp_not_loaded": "WhatsApp Notifier is not installed or not loaded."
     }
   },
   "issues": {
     "token_expiring": {
       "title": "Bambu Lab sign-in expires soon",
       "description": "The Bambu Lab sign-in token expires in {days} days. Open Filament Stock, choose **Reconfigure** and then **Sign in to Bambu Lab again**."
+    },
+    "not_sliced": {
+      "title": "Unsliced files in the print queue",
+      "description": "These files have no sliced plates and are not counted: {files}. In Bambu Studio choose File > Export > Export plate sliced file and put the `.gcode.3mf` in the folder."
+    },
+    "unmatched_colors": {
+      "title": "File colors without a spool",
+      "description": "No spool matches these colors from the sliced files: {colors}. They count as negative stock. Add the spool in Bambu Studio, or map the color with the action `filament_stock.map_color`."
     }
   },
   "exceptions": {
@@ -110,6 +142,24 @@
     },
     "spool_not_in_group": {
       "message": "This spool is not part of the chosen color group."
+    },
+    "notify_title": {
+      "message": "Filament Stock"
+    },
+    "notify_new_spool": {
+      "message": "New spool: {group} ({name}), {grams} g. Check the weight in Bambu Studio."
+    },
+    "notify_negative": {
+      "message": "Not enough filament: {group} balance {balance} g (stock {stock} g, needed {needed} g)."
+    },
+    "notify_low": {
+      "message": "Low filament: {group} balance {balance} g, below {threshold} g."
+    },
+    "notify_not_sliced": {
+      "message": "Not sliced: {file}. Export it as a sliced plate file."
+    },
+    "notify_token": {
+      "message": "The Bambu Lab sign-in expires in {days} days. Open Filament Stock and choose Reconfigure > Sign in again."
     }
   },
   "entity": {
@@ -193,6 +243,15 @@
           "name": "Spool ID",
           "description": "Only this spool. Spool IDs are in the spools attribute of the stock sensor."
         }
+      }
+    }
+  },
+  "selector": {
+    "notify_method": {
+      "options": {
+        "whatsapp": "WhatsApp Notifier (recommended)",
+        "notify_entity": "Notify entity",
+        "persistent": "Home Assistant notification"
       }
     }
   }

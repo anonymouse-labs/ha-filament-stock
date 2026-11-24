@@ -80,13 +80,45 @@
           "match_nearest": "Heeft een bestandskleur geen spoel met precies dezelfde kleur en hetzelfde materiaal, gebruik dan de dichtstbijzijnde.",
           "match_distance": "Lager is strenger. Rond 2 is nauwelijks zichtbaar, 10 is een duidelijk vergelijkbare tint."
         }
+      },
+      "notify": {
+        "title": "Meldingen",
+        "description": "Kies hoe Filament Stock je meldt over nieuwe spoelen, een laag of negatief saldo, niet-gesliceerde bestanden en een verlopende Bambu Lab-inlog.\n\n**Aanbevolen: WhatsApp Notifier** ({whatsapp_url}). Gratis, stuurt WhatsApp-berichten rechtstreeks vanuit Home Assistant, zonder externe server of betaalde API. Let op: hij werkt via een onofficieel WhatsApp-protocol. Installeer hem eerst en kies hem daarna hier.\n\nElke andere `notify`-entiteit werkt ook. Lukt verzenden niet, dan komt er een melding in Home Assistant.",
+        "data": {
+          "notify_method": "Versturen via",
+          "notify_entity": "Notify-entiteit",
+          "notify_chat_id": "WhatsApp-chat-ID",
+          "notify_new_spool": "Nieuwe spoel gevonden",
+          "notify_negative": "Saldo onder 0 g",
+          "notify_low": "Saldo onder (0 = uit)",
+          "notify_not_sliced": "Niet-gesliceerd bestand in de map",
+          "notify_token": "Inlog bij Bambu Lab verloopt binnenkort"
+        },
+        "data_description": {
+          "notify_entity": "Nodig bij 'Notify-entiteit'. Een chat van WhatsApp Notifier is ook een notify-entiteit.",
+          "notify_chat_id": "Alleen voor WhatsApp Notifier. Leeg laten voor de standaardchat.",
+          "notify_new_spool": "Met een herinnering om het gewicht te controleren.",
+          "notify_low": "Eén melding als een kleurgroep onder dit aantal gram zakt."
+        }
       }
+    },
+    "error": {
+      "notify_entity_required": "Kies een notify-entiteit.",
+      "whatsapp_not_loaded": "WhatsApp Notifier is niet geïnstalleerd of niet geladen."
     }
   },
   "issues": {
     "token_expiring": {
       "title": "Inloggen bij Bambu Lab verloopt binnenkort",
       "description": "Het inlogtoken van Bambu Lab verloopt over {days} dagen. Open Filament Stock, kies **Opnieuw configureren** en daarna **Opnieuw inloggen bij Bambu Lab**."
+    },
+    "not_sliced": {
+      "title": "Niet-gesliceerde bestanden in de printwachtrij",
+      "description": "Deze bestanden hebben geen gesliceerde platen en tellen niet mee: {files}. Kies in Bambu Studio Bestand > Exporteren > Gesliceerd plaatbestand exporteren en zet het `.gcode.3mf`-bestand in de map."
+    },
+    "unmatched_colors": {
+      "title": "Bestandskleuren zonder spoel",
+      "description": "Geen spoel past bij deze kleuren uit de gesliceerde bestanden: {colors}. Ze tellen als negatieve voorraad. Voeg de spoel toe in Bambu Studio, of koppel de kleur met de actie `filament_stock.map_color`."
     }
   },
   "exceptions": {
@@ -110,6 +142,24 @@
     },
     "spool_not_in_group": {
       "message": "Deze spoel hoort niet bij de gekozen kleurgroep."
+    },
+    "notify_title": {
+      "message": "Filament Stock"
+    },
+    "notify_new_spool": {
+      "message": "Nieuwe spoel: {group} ({name}), {grams} g. Controleer het gewicht in Bambu Studio."
+    },
+    "notify_negative": {
+      "message": "Te weinig filament: {group} saldo {balance} g (voorraad {stock} g, nodig {needed} g)."
+    },
+    "notify_low": {
+      "message": "Filament bijna op: {group} saldo {balance} g, onder {threshold} g."
+    },
+    "notify_not_sliced": {
+      "message": "Niet gesliceerd: {file}. Exporteer het als gesliceerd plaatbestand."
+    },
+    "notify_token": {
+      "message": "De inlog bij Bambu Lab verloopt over {days} dagen. Open Filament Stock en kies Opnieuw configureren > Opnieuw inloggen."
     }
   },
   "entity": {
@@ -193,6 +243,15 @@
           "name": "Spoel-ID",
           "description": "Alleen deze spoel. Spoel-ID's staan in het attribuut spools van de voorraadsensor."
         }
+      }
+    }
+  },
+  "selector": {
+    "notify_method": {
+      "options": {
+        "whatsapp": "WhatsApp Notifier (aanbevolen)",
+        "notify_entity": "Notify-entiteit",
+        "persistent": "Melding in Home Assistant"
       }
     }
   }
