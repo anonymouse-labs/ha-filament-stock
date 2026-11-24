@@ -1,9 +1,31 @@
 {
   "config": {
     "step": {
+      "account": {
+        "title": "Bambu Lab-account",
+        "description": "Filament Stock leest je spoelen uit de Bambu Lab-cloud: de filamentlijst die je beheert in Bambu Studio of de Bambu Handy-app. De cloud is verplicht, zonder werkt de integratie niet.\n\nJe wachtwoord wordt alleen gebruikt om een inlogtoken op te halen en wordt nooit opgeslagen. Het token is ongeveer 90 dagen geldig, Home Assistant vraagt je opnieuw in te loggen voordat het verloopt.\n\nDe cloud-API van Bambu Lab is onofficieel en kan zonder aankondiging veranderen.",
+        "data": {
+          "account": "E-mailadres",
+          "password": "Wachtwoord"
+        }
+      },
+      "verify_code": {
+        "title": "Code per e-mail",
+        "description": "Bambu Lab heeft een inlogcode naar je e-mail gestuurd. Vul die hier in.",
+        "data": {
+          "code": "Code"
+        }
+      },
+      "tfa": {
+        "title": "Tweestapsverificatie",
+        "description": "Vul de code uit je authenticator-app in.",
+        "data": {
+          "code": "Code"
+        }
+      },
       "drive": {
         "title": "Printwachtrij in Google Drive",
-        "description": "Filament Stock leest je gesliceerde platen (`*.gcode.3mf`) uit een Google Drive-map, met alleen leestoegang.\n\n1. Open de Google Cloud Console en kies of maak een project.\n2. Zet de **Google Drive API** aan voor dat project.\n3. Maak onder **IAM en beheer > Serviceaccounts** een serviceaccount zonder rollen en voeg een **JSON-sleutel** toe. Plak deze JSON nooit in een chat of issue.\n4. Kopieer het e-mailadres van het serviceaccount (eindigt op `iam.gserviceaccount.com`).\n5. Deel de map in Google Drive (webversie) met dat adres als **Kijker**.\n6. Kopieer de map-ID uit de URL: `drive.google.com/drive/folders/<ID>`.\n7. Plak hieronder de JSON en de map-ID (of de volledige map-URL).\n\nVolledige handleiding en problemen oplossen: {setup_url}",
+        "description": "Filament Stock leest je gesliceerde platen (`*.gcode.3mf`) uit een Google Drive-map, met alleen leestoegang.\n\n1. Open de Google Cloud Console en kies of maak een project.\n2. Zet de **Google Drive API** aan voor dat project.\n3. Maak onder **IAM en beheer > Serviceaccounts** een serviceaccount zonder rollen en voeg een **JSON-sleutel** toe. Plak deze JSON nooit in een chat of issue.\n4. Kopieer het e-mailadres van het serviceaccount (eindigt op `iam.gserviceaccount.com`).\n5. Deel de map in Google Drive (webversie) met dat adres als **Kijker**.\n6. Kopieer de map-ID uit de URL: `drive.google.com/drive/folders/<ID>`.\n7. Plak hieronder de JSON en de map-ID (of de volledige map-URL). Bij opnieuw configureren laat je de JSON leeg om de opgeslagen sleutel te houden.\n\nVolledige handleiding en problemen oplossen: {setup_url}",
         "data": {
           "service_account": "JSON-sleutel van het serviceaccount",
           "folder_id": "Map-ID of map-URL"
@@ -12,9 +34,20 @@
           "service_account": "De volledige inhoud van het JSON-sleutelbestand.",
           "folder_id": "De map met je gesliceerde platen."
         }
+      },
+      "reconfigure": {
+        "title": "Filament Stock opnieuw configureren",
+        "menu_options": {
+          "account": "Opnieuw inloggen bij Bambu Lab",
+          "drive": "Google Drive-map of -sleutel wijzigen"
+        }
       }
     },
     "error": {
+      "invalid_auth": "Onjuist e-mailadres of wachtwoord.",
+      "invalid_code": "De code is onjuist.",
+      "code_expired": "De code is verlopen. Bambu Lab heeft een nieuwe code naar je e-mail gestuurd.",
+      "cloudflare_blocked": "De Bambu Lab-cloud heeft het verzoek geblokkeerd. Probeer het later opnieuw.",
       "invalid_json": "Dit is geen geldige JSON. Plak de volledige inhoud van het sleutelbestand.",
       "invalid_service_account": "Deze JSON is geen bruikbare serviceaccountsleutel. Maak een nieuwe JSON-sleutel voor het serviceaccount.",
       "invalid_folder_id": "Dit is geen geldige map-ID of map-URL.",
@@ -22,12 +55,15 @@
       "not_a_folder": "Deze ID hoort bij een bestand, niet bij een map.",
       "forbidden": "Geen toegang. Deel de map met {email} als Kijker.",
       "drive_api_disabled": "De Google Drive API staat niet aan voor dit Google Cloud-project.",
-      "rate_limited": "Google Drive beperkt het aantal verzoeken. Probeer het over een paar minuten opnieuw.",
+      "rate_limited": "Te veel verzoeken. Probeer het over een paar minuten opnieuw.",
       "file_too_large": "Een bestand is te groot om te lezen.",
-      "cannot_connect": "Google is niet bereikbaar. Controleer de netwerkverbinding van Home Assistant."
+      "cannot_connect": "Geen verbinding. Controleer de netwerkverbinding van Home Assistant."
     },
     "abort": {
-      "already_configured": "Deze map is al ingesteld."
+      "already_configured": "Dit Bambu Lab-account is al ingesteld.",
+      "reauth_successful": "Opnieuw ingelogd.",
+      "reconfigure_successful": "Instellingen opgeslagen.",
+      "wrong_account": "Dit is een ander Bambu Lab-account dan het ingestelde."
     }
   },
   "options": {
@@ -35,14 +71,24 @@
       "init": {
         "title": "Opties Filament Stock",
         "data": {
+          "spool_interval": "Bambu Lab-cloud controleren elke",
           "queue_interval": "Drive-map controleren elke"
         }
       }
     }
   },
+  "issues": {
+    "token_expiring": {
+      "title": "Inloggen bij Bambu Lab verloopt binnenkort",
+      "description": "Het inlogtoken van Bambu Lab verloopt over {days} dagen. Open Filament Stock, kies **Opnieuw configureren** en daarna **Opnieuw inloggen bij Bambu Lab**."
+    }
+  },
   "exceptions": {
     "invalid_service_account": {
-      "message": "De opgeslagen sleutel van het Google-serviceaccount is ongeldig. Verwijder de integratie en voeg haar opnieuw toe."
+      "message": "De opgeslagen sleutel van het Google-serviceaccount is ongeldig. Configureer de integratie opnieuw met een nieuwe sleutel."
+    },
+    "token_rejected": {
+      "message": "De Bambu Lab-cloud heeft het inlogtoken geweigerd. Log opnieuw in."
     }
   }
 }

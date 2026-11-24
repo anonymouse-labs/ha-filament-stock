@@ -13,4 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Spool ledger with rebase on cloud weight change and duplicate protection.
 - Read-only Google Drive client (service account) with separate error causes.
 - Print queue coordinator with a stored cache: startup never waits on downloads.
-- Config flow step for the Drive folder, options flow for the polling interval.
+- Read-only Bambu Lab cloud client: login with email code or 2FA, paginated spool list.
+- Spool coordinator with a stored list, token expiry warning in Repairs and reauth.
+- Config flow: Bambu Lab account, then the Drive folder; reconfigure and options.
+- Diagnostics with redaction of tokens, accounts, keys and device serials.

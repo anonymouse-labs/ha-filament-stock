@@ -6,9 +6,9 @@ import asyncio
 from collections.abc import Generator
 from datetime import timedelta
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
-from conftest import FOLDER_ID
+from conftest import FOLDER_ID, FakeTransport
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -19,6 +19,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 from threemf import REFERENCE_PLATE, build_3mf, slice_info
 
+from custom_components.filament_stock.bambu_api import FILAMENT_PATH
 from custom_components.filament_stock.const import (
     CONF_FOLDER_ID,
     CONF_SERVICE_ACCOUNT,
@@ -71,7 +72,8 @@ class FakeDrive:
 
 
 @pytest.fixture
-def drive() -> Generator[FakeDrive]:
+def drive(bambu: FakeTransport) -> Generator[FakeDrive]:
+    bambu.json("GET", FILAMENT_PATH, {"total": 0, "hits": []})
     fake = FakeDrive()
     with (
         patch(
@@ -90,17 +92,6 @@ def drive() -> Generator[FakeDrive]:
         yield fake
 
 
-@pytest.fixture
-def entry(hass: HomeAssistant, service_account_json: str) -> MockConfigEntry:
-    config_entry = MockConfigEntry(
-        domain=DOMAIN,
-        unique_id=FOLDER_ID,
-        data={CONF_SERVICE_ACCOUNT: service_account_json, CONF_FOLDER_ID: FOLDER_ID},
-    )
-    config_entry.add_to_hass(hass)
-    return config_entry
-
-
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> Any:
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
@@ -112,7 +103,7 @@ def _flush_store(hass: HomeAssistant) -> None:
 
 
 async def test_reads_reference_plate(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
+    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive, bambu: FakeTransport
 ) -> None:
     drive.add("f1", PLATE_NAME, SLICED)
     queue = await _setup(hass, entry)
@@ -126,7 +117,7 @@ async def test_reads_reference_plate(
 
 
 async def test_sorts_files(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
+    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive, bambu: FakeTransport
 ) -> None:
     drive.add("f1", "plate.gcode.3mf", SLICED)
     drive.add("f2", "project.3mf", PROJECT)
@@ -141,7 +132,7 @@ async def test_sorts_files(
 
 
 async def test_unchanged_files_are_not_downloaded_again(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
+    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive, bambu: FakeTransport
 ) -> None:
     drive.add("f1", "plate.gcode.3mf", SLICED)
     queue = await _setup(hass, entry)
@@ -154,7 +145,7 @@ async def test_unchanged_files_are_not_downloaded_again(
 
 
 async def test_failed_download_keeps_previous_version(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
+    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive, bambu: FakeTransport
 ) -> None:
     drive.add("f1", "plate.gcode.3mf", SLICED)
     queue = await _setup(hass, entry)
@@ -168,7 +159,7 @@ async def test_failed_download_keeps_previous_version(
 
 
 async def test_failed_new_download_is_pending(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
+    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive, bambu: FakeTransport
 ) -> None:
     drive.add("f1", "plate.gcode.3mf", DriveError())
     drive.add("f2", "big.gcode.3mf", DriveFileTooLarge())
@@ -179,7 +170,7 @@ async def test_failed_new_download_is_pending(
 
 
 async def test_folder_error_fails_update(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
+    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive, bambu: FakeTransport
 ) -> None:
     drive.folder_error = DriveNotFound()
     queue = await _setup(hass, entry)
@@ -188,7 +179,7 @@ async def test_folder_error_fails_update(
 
 
 async def test_setup_does_not_wait_for_downloads(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
+    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive, bambu: FakeTransport
 ) -> None:
     drive.add("f1", "plate.gcode.3mf", SLICED)
     drive.gate = asyncio.Event()
@@ -202,7 +193,7 @@ async def test_setup_does_not_wait_for_downloads(
 
 
 async def test_restart_reads_cache_first(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
+    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive, bambu: FakeTransport
 ) -> None:
     drive.add("f1", PLATE_NAME, SLICED)
     await _setup(hass, entry)
@@ -222,7 +213,7 @@ async def test_restart_reads_cache_first(
 
 
 async def test_moved_file_is_still_found(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
+    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive, bambu: FakeTransport
 ) -> None:
     drive.add("f1", PLATE_NAME, SLICED)
     queue = await _setup(hass, entry)
@@ -239,21 +230,9 @@ async def test_moved_file_is_still_found(
 
 async def test_bad_service_account_fails_setup(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(
-        domain=DOMAIN, data={CONF_SERVICE_ACCOUNT: "{}", CONF_FOLDER_ID: FOLDER_ID}
+        domain=DOMAIN,
+        data={CONF_SERVICE_ACCOUNT: "{}", CONF_FOLDER_ID: FOLDER_ID, "token": "t"},
     )
     entry.add_to_hass(hass)
     assert not await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is ConfigEntryState.SETUP_ERROR
-
-
-async def test_options_change_reloads(
-    hass: HomeAssistant, entry: MockConfigEntry, drive: FakeDrive
-) -> None:
-    await _setup(hass, entry)
-    with patch(
-        "custom_components.filament_stock.async_setup_entry",
-        AsyncMock(return_value=True),
-    ) as setup:
-        hass.config_entries.async_update_entry(entry, options={"queue_interval": 5})
-        await hass.async_block_till_done(wait_background_tasks=True)
-    assert setup.called

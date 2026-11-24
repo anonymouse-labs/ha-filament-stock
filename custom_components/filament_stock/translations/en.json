@@ -1,9 +1,31 @@
 {
   "config": {
     "step": {
+      "account": {
+        "title": "Bambu Lab account",
+        "description": "Filament Stock reads your spools from the Bambu Lab cloud: the filament list you manage in Bambu Studio or the Bambu Handy app. The cloud is required, the integration does not work without it.\n\nYour password is only used to get a sign-in token and is never stored. The token lasts about 90 days, Home Assistant asks you to sign in again before it expires.\n\nThe Bambu Lab cloud API is unofficial and may change without notice.",
+        "data": {
+          "account": "Email",
+          "password": "Password"
+        }
+      },
+      "verify_code": {
+        "title": "Email code",
+        "description": "Bambu Lab sent a sign-in code to your email. Enter it here.",
+        "data": {
+          "code": "Code"
+        }
+      },
+      "tfa": {
+        "title": "Two-factor authentication",
+        "description": "Enter the code from your authenticator app.",
+        "data": {
+          "code": "Code"
+        }
+      },
       "drive": {
         "title": "Google Drive print queue",
-        "description": "Filament Stock reads your sliced plates (`*.gcode.3mf`) from a Google Drive folder with read-only access.\n\n1. Open the Google Cloud Console and select or create a project.\n2. Enable the **Google Drive API** for that project.\n3. Under **IAM & Admin > Service accounts**, create a service account without roles and add a **JSON key**. Never paste this JSON in a chat or issue.\n4. Copy the service account email (ends with `iam.gserviceaccount.com`).\n5. In Google Drive on the web, share the folder with that email as **Viewer**.\n6. Copy the folder ID from the URL: `drive.google.com/drive/folders/<ID>`.\n7. Paste the JSON and the folder ID (or the full folder URL) below.\n\nFull guide and troubleshooting: {setup_url}",
+        "description": "Filament Stock reads your sliced plates (`*.gcode.3mf`) from a Google Drive folder with read-only access.\n\n1. Open the Google Cloud Console and select or create a project.\n2. Enable the **Google Drive API** for that project.\n3. Under **IAM & Admin > Service accounts**, create a service account without roles and add a **JSON key**. Never paste this JSON in a chat or issue.\n4. Copy the service account email (ends with `iam.gserviceaccount.com`).\n5. In Google Drive on the web, share the folder with that email as **Viewer**.\n6. Copy the folder ID from the URL: `drive.google.com/drive/folders/<ID>`.\n7. Paste the JSON and the folder ID (or the full folder URL) below. When reconfiguring, leave the JSON empty to keep the stored key.\n\nFull guide and troubleshooting: {setup_url}",
         "data": {
           "service_account": "Service account JSON key",
           "folder_id": "Folder ID or folder URL"
@@ -12,9 +34,20 @@
           "service_account": "The complete contents of the JSON key file.",
           "folder_id": "The folder that holds your sliced plates."
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Filament Stock",
+        "menu_options": {
+          "account": "Sign in to Bambu Lab again",
+          "drive": "Change the Google Drive folder or key"
+        }
       }
     },
     "error": {
+      "invalid_auth": "Wrong email or password.",
+      "invalid_code": "The code is wrong.",
+      "code_expired": "The code expired. Bambu Lab sent a new code to your email.",
+      "cloudflare_blocked": "The Bambu Lab cloud blocked the request. Try again later.",
       "invalid_json": "This is not valid JSON. Paste the complete contents of the key file.",
       "invalid_service_account": "This JSON is not a usable service account key. Create a new JSON key for the service account.",
       "invalid_folder_id": "This is not a valid folder ID or folder URL.",
@@ -22,12 +55,15 @@
       "not_a_folder": "This ID belongs to a file, not a folder.",
       "forbidden": "Access denied. Share the folder with {email} as Viewer.",
       "drive_api_disabled": "The Google Drive API is not enabled for this Google Cloud project.",
-      "rate_limited": "Google Drive is rate limiting requests. Try again in a few minutes.",
+      "rate_limited": "Too many requests. Try again in a few minutes.",
       "file_too_large": "A file is too large to read.",
-      "cannot_connect": "Cannot reach Google. Check the network connection of Home Assistant."
+      "cannot_connect": "Cannot connect. Check the network connection of Home Assistant."
     },
     "abort": {
-      "already_configured": "This folder is already set up."
+      "already_configured": "This Bambu Lab account is already set up.",
+      "reauth_successful": "Signed in again.",
+      "reconfigure_successful": "Settings saved.",
+      "wrong_account": "This is a different Bambu Lab account than the one set up."
     }
   },
   "options": {
@@ -35,14 +71,24 @@
       "init": {
         "title": "Filament Stock options",
         "data": {
+          "spool_interval": "Check the Bambu Lab cloud every",
           "queue_interval": "Check the Drive folder every"
         }
       }
     }
   },
+  "issues": {
+    "token_expiring": {
+      "title": "Bambu Lab sign-in expires soon",
+      "description": "The Bambu Lab sign-in token expires in {days} days. Open Filament Stock, choose **Reconfigure** and then **Sign in to Bambu Lab again**."
+    }
+  },
   "exceptions": {
     "invalid_service_account": {
-      "message": "The stored Google service account key is invalid. Remove and add the integration again."
+      "message": "The stored Google service account key is invalid. Reconfigure the integration with a new key."
+    },
+    "token_rejected": {
+      "message": "The Bambu Lab cloud rejected the sign-in token. Sign in again."
     }
   }
 }
