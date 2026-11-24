@@ -1,0 +1,48 @@
+{
+  "config": {
+    "step": {
+      "drive": {
+        "title": "Printwachtrij in Google Drive",
+        "description": "Filament Stock leest je gesliceerde platen (`*.gcode.3mf`) uit een Google Drive-map, met alleen leestoegang.\n\n1. Open de Google Cloud Console en kies of maak een project.\n2. Zet de **Google Drive API** aan voor dat project.\n3. Maak onder **IAM en beheer > Serviceaccounts** een serviceaccount zonder rollen en voeg een **JSON-sleutel** toe. Plak deze JSON nooit in een chat of issue.\n4. Kopieer het e-mailadres van het serviceaccount (eindigt op `iam.gserviceaccount.com`).\n5. Deel de map in Google Drive (webversie) met dat adres als **Kijker**.\n6. Kopieer de map-ID uit de URL: `drive.google.com/drive/folders/<ID>`.\n7. Plak hieronder de JSON en de map-ID (of de volledige map-URL).\n\nVolledige handleiding en problemen oplossen: {setup_url}",
+        "data": {
+          "service_account": "JSON-sleutel van het serviceaccount",
+          "folder_id": "Map-ID of map-URL"
+        },
+        "data_description": {
+          "service_account": "De volledige inhoud van het JSON-sleutelbestand.",
+          "folder_id": "De map met je gesliceerde platen."
+        }
+      }
+    },
+    "error": {
+      "invalid_json": "Dit is geen geldige JSON. Plak de volledige inhoud van het sleutelbestand.",
+      "invalid_service_account": "Deze JSON is geen bruikbare serviceaccountsleutel. Maak een nieuwe JSON-sleutel voor het serviceaccount.",
+      "invalid_folder_id": "Dit is geen geldige map-ID of map-URL.",
+      "folder_not_found": "Map niet gevonden. Controleer de ID en deel de map met {email} als Kijker.",
+      "not_a_folder": "Deze ID hoort bij een bestand, niet bij een map.",
+      "forbidden": "Geen toegang. Deel de map met {email} als Kijker.",
+      "drive_api_disabled": "De Google Drive API staat niet aan voor dit Google Cloud-project.",
+      "rate_limited": "Google Drive beperkt het aantal verzoeken. Probeer het over een paar minuten opnieuw.",
+      "file_too_large": "Een bestand is te groot om te lezen.",
+      "cannot_connect": "Google is niet bereikbaar. Controleer de netwerkverbinding van Home Assistant."
+    },
+    "abort": {
+      "already_configured": "Deze map is al ingesteld."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opties Filament Stock",
+        "data": {
+          "queue_interval": "Drive-map controleren elke"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_service_account": {
+      "message": "De opgeslagen sleutel van het Google-serviceaccount is ongeldig. Verwijder de integratie en voeg haar opnieuw toe."
+    }
+  }
+}

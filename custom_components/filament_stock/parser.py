@@ -112,6 +112,19 @@ class ParsedFile:
         )
 
 
+_NAME_SUFFIXES = (".gcode.3mf", ".3mf", ".gcode")
+
+
+def normalize_name(name: str) -> str:
+    """File name for matching: base name, lower case, no suffix, only alnum."""
+    value = name.replace("\\", "/").rsplit("/", 1)[-1].strip().lower()
+    for suffix in _NAME_SUFFIXES:
+        if value.endswith(suffix):
+            value = value[: -len(suffix)]
+            break
+    return "".join(ch for ch in value if ch.isalnum())
+
+
 def normalize_material(value: str | None) -> str:
     """Material name as used for matching, e.g. 'PLA'."""
     return (value or "").strip().upper() or "UNKNOWN"

@@ -11,3 +11,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Parser for sliced `.gcode.3mf` files with size limits and safe XML handling.
 - Color groups by material, color and note; matching with CIEDE2000.
 - Spool ledger with rebase on cloud weight change and duplicate protection.
+- Read-only Google Drive client (service account) with separate error causes.
+- Print queue coordinator with a stored cache: startup never waits on downloads.
+- Config flow step for the Drive folder, options flow for the polling interval.

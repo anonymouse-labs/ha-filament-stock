@@ -175,3 +175,20 @@ def test_round_trip_dict() -> None:
     assert ParsedFile.from_dict({"status": "not_sliced"}).status is (
         ParseStatus.NOT_SLICED
     )
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        (
+            "12 Gear BOX spare links v2.gcode.3mf",
+            "12gearboxsparelinksv2",
+        ),
+        ("12_Gear_BOX_spare-links v2.3mf", "12gearboxsparelinksv2"),
+        ("/data/Metadata/Plate_1.gcode", "plate1"),
+        (r"C:\prints\Box.gcode.3mf", "box"),
+        ("  ", ""),
+    ],
+)
+def test_normalize_name(name: str, expected: str) -> None:
+    assert parser.normalize_name(name) == expected
