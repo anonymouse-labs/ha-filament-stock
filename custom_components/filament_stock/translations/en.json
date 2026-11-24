@@ -164,9 +164,6 @@
   },
   "entity": {
     "sensor": {
-      "stock": {
-        "name": "{group} stock"
-      },
       "needed": {
         "name": "{group} needed"
       },
@@ -199,6 +196,11 @@
           "missed_end": "End missed, nothing booked",
           "no_printer": "No printer found"
         }
+      }
+    },
+    "number": {
+      "stock": {
+        "name": "{group} stock"
       }
     }
   },

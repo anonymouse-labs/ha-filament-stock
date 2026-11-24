@@ -100,13 +100,15 @@ One device **Filament Stock** with these sensors.
 
 Per color group, for example `PLA #006633 matte`:
 
-| Sensor | Meaning |
+| Entity | Meaning |
 | --- | --- |
-| `… stock` | Remaining grams over all spools of the group, minus local usage. |
-| `… needed` | Grams needed by the sliced files in the queue. |
-| `… balance` | Stock minus needed. Negative means you need more filament. |
+| `… stock` (number) | Remaining grams over all spools of the group, minus local usage. You can change it in Home Assistant, see below. |
+| `… needed` (sensor) | Grams needed by the sliced files in the queue. |
+| `… balance` (sensor) | Stock minus needed. Negative means you need more filament. |
 
 Attributes: `material`, `color`, `note`, `spools` (id, name, vendor, remaining, in printer) and `file_colors` (which file colors count here and how they were matched).
+
+**Changing the stock in Home Assistant.** Enter a new value in the stock number, for example after weighing a spool. It is stored as a local correction for the color group (attribute `correction`), prints are deducted from it, and the balance follows. When the remaining weight of a spool of that group changes in Bambu Studio, the cloud value wins again. The value is not written to the Bambu Lab cloud.
 
 A file color without any matching spool gets its own group `unknown …` with a negative balance. It is never ignored.
 
@@ -142,8 +144,8 @@ Entity IDs depend on your colors and language. Check them under **Settings > Dev
 | Action | Use |
 | --- | --- |
 | `filament_stock.refresh` | Read the cloud and the folder now. |
-| `filament_stock.map_color` | Always count a file color (`material`, `color`) against a chosen color group. Leave out `group` to remove the mapping. Admin only. |
-| `filament_stock.reset_ledger` | Forget the local usage of one spool (`spool_id`) or of a whole color group, and its shortage. Admin only. |
+| `filament_stock.map_color` | Always count a file color (`material`, `color`) against a chosen color group (any of its entities). Leave out `group` to remove the mapping. Admin only. |
+| `filament_stock.reset_ledger` | Forget the local usage of one spool (`spool_id`) or of a whole color group, and its correction. Admin only. |
 
 ## Color matching
 

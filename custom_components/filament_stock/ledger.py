@@ -140,6 +140,20 @@ class Ledger:
         entry.used = 0.0
         return True
 
+    def set_group_stock(
+        self, group_id: str, grams: float, spool_ids: Iterable[int]
+    ) -> None:
+        """Make the stock of a group equal `grams` with a group correction.
+
+        The correction shares the shortage field: positive is missing filament,
+        negative is extra. A new cloud weight for the group clears it again.
+        """
+        correction = sum(self.remaining(s) for s in spool_ids) - grams
+        if abs(correction) <= _EPSILON:
+            self.shortage.pop(group_id, None)
+        else:
+            self.shortage[group_id] = correction
+
     def clear_shortage(self, group_id: str) -> bool:
         """Forget the shortage of one group. Returns False if there was none."""
         return self.shortage.pop(group_id, None) is not None

@@ -62,8 +62,9 @@ async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
 
 
 def _entity(hass: HomeAssistant, entry: MockConfigEntry, key: str) -> str | None:
+    domain = "number" if key.endswith("_stock") and key != "total_stock" else "sensor"
     return er.async_get(hass).async_get_entity_id(
-        "sensor", DOMAIN, f"{entry.entry_id}_{key}"
+        domain, DOMAIN, f"{entry.entry_id}_{key}"
     )
 
 
@@ -382,3 +383,49 @@ async def test_empty_cloud_list_is_ignored(
     assert not entry.runtime_data.spools.last_update_success
     assert manager.ledger.remaining(1) == 900
     assert _value(hass, entry, "pla_000000_stock") == 900
+
+
+async def test_stock_can_be_set(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    _spools(bambu, BLACK)
+    await _setup(hass, entry)
+    stock = _entity(hass, entry, "pla_000000_stock")
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": stock, "value": 1200}, blocking=True
+    )
+    assert _value(hass, entry, "pla_000000_stock") == 1200
+    assert _value(hass, entry, "pla_000000_balance") == 1200
+    assert hass.states.get(stock).attributes["correction"] == 200
+
+    # A print deducts from the corrected stock.
+    manager = entry.runtime_data.manager
+    manager.ledger.deduct("job-1", {"pla_000000": 100}, manager.spools.data.groups)
+    manager.async_update()
+    assert _value(hass, entry, "pla_000000_stock") == 1100
+
+    # A new weight in Bambu Studio wins over the local value.
+    _spools(bambu, {**BLACK, "netWeight": 700})
+    await entry.runtime_data.spools.async_refresh()
+    await hass.async_block_till_done()
+    assert _value(hass, entry, "pla_000000_stock") == 700
+
+
+async def test_old_stock_sensors_are_removed(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, drive: FakeDrive
+) -> None:
+    old = (
+        er.async_get(hass)
+        .async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{entry.entry_id}_pla_000000_stock",
+            config_entry=entry,
+            translation_key="stock",
+        )
+        .entity_id
+    )
+    _spools(bambu, BLACK)
+    await _setup(hass, entry)
+    assert er.async_get(hass).async_get(old) is None
+    assert _value(hass, entry, "pla_000000_stock") == 1000

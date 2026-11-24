@@ -23,7 +23,7 @@ from .spools import SpoolCoordinator
 from .stock import StockManager
 from .tracker import PrintTracker
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.NUMBER, Platform.SENSOR]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 

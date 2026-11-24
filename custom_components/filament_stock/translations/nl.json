@@ -164,9 +164,6 @@
   },
   "entity": {
     "sensor": {
-      "stock": {
-        "name": "{group} voorraad"
-      },
       "needed": {
         "name": "{group} nodig"
       },
@@ -199,6 +196,11 @@
           "missed_end": "Einde gemist, niets afgeboekt",
           "no_printer": "Geen printer gevonden"
         }
+      }
+    },
+    "number": {
+      "stock": {
+        "name": "{group} voorraad"
       }
     }
   },

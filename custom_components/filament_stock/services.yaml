@@ -21,7 +21,7 @@ map_color:
       selector:
         entity:
           integration: filament_stock
-          domain: sensor
+          domain: [number, sensor]
 
 reset_ledger:
   fields:
@@ -30,7 +30,7 @@ reset_ledger:
       selector:
         entity:
           integration: filament_stock
-          domain: sensor
+          domain: [number, sensor]
     spool_id:
       selector:
         number:

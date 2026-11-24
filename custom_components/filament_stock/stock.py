@@ -286,3 +286,13 @@ class StockManager:
         self.async_save()
         self.async_update()
         return True
+
+    @callback
+    def set_group_stock(self, group_id: str, grams: float) -> None:
+        """Stock entered in Home Assistant, kept until the cloud weight changes."""
+        item = self.state.get(group_id)
+        if item is None:
+            return
+        self.ledger.set_group_stock(group_id, grams, [s["id"] for s in item.spools])
+        self.async_save()
+        self.async_update()
