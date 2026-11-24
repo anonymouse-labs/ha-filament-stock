@@ -22,3 +22,4 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Print tracking via ha-bambulab: the file and grams per color are stored at print start; finish books 100 %, failed books the progress reached, each print is booked once. Last deduction sensor.
 - Notifications for new spools, negative or low balance, unsliced files and token expiry; via WhatsApp Notifier, any notify entity or a persistent notification. Each event once, combined and rate limited.
 - Repair issues for unsliced files and file colors without a spool.
+- Own brand icon, README with setup guide, security policy, contributing guide and issue templates.
