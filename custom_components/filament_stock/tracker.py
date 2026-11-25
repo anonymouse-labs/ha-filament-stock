@@ -360,8 +360,8 @@ class PrintTracker:
                 status=status,
                 fraction=round(fraction, 3),
                 grams={
-                    f"{m.material} {m.color}": round(usage.get(key, 0.0), 2)
-                    for key, m in mapped.matches.items()
+                    self._manager.group_title(k): round(v, 2)
+                    for k, v in mapped.grams.items()
                 },
                 groups={k: round(v, 2) for k, v in mapped.grams.items()},
                 # Two loaded spools with the same color: the file cannot tell

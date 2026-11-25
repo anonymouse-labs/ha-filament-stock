@@ -291,6 +291,18 @@ class StockManager:
     def total_needed(self) -> float:
         return sum(self.needs.grams.values())
 
+    def group_title(self, group_id: str) -> str:
+        """Name as shown in the stock list: 'PLA · DHM00001 Zwart' or 'PLA #FFFFFF'."""
+        item = self.state.get(group_id)
+        if item is None:
+            material, color = self.unknown_meta.get(group_id, ("", group_id))
+            return f"{material} {color}".strip()
+        return (
+            f"{item.material} · {item.note}"
+            if item.note
+            else f"{item.material} {item.color}"
+        )
+
     # Booking a print
 
     async def async_book(

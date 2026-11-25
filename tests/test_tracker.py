@@ -101,7 +101,8 @@ async def test_finish_books_reference_plate_once(
     last = _last(entry)
     assert last["result"] == "booked"
     assert last["fraction"] == 1.0
-    assert last["grams"] == {"PLA #101410": 15.02, "PLA #898989": 11.12}
+    # Named like the stock list (the color group), not like the file color.
+    assert last["grams"] == {"PLA #000000": 15.02, "PLA #898989": 11.12}
     assert last["spools"] == {"1": 15.02, "2": 11.12}
 
     # The same end again books nothing extra.

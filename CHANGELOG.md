@@ -26,4 +26,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Select per color in the queue to choose the spool it counts against; notification for unknown colors with the nearest spool or the color code to add in Bambu Studio.
 - Booking a print prefers the spool that is in the printer.
 - Last deduction lists colors that match two loaded spools equally (`ambiguous`). README section on linking spools to the AMS.
+- Last deduction names the grams per color group like the stock list (for example `PLA · DHM00001 Zwart`) instead of the raw file color.
 - Own brand icon, README with setup guide, security policy, contributing guide and issue templates.
