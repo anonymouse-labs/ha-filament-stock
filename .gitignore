@@ -27,3 +27,6 @@ Thumbs.db
 *.gcode.3mf
 secrets*.json
 service_account*.json
+
+# Local dashboards and notes, never published
+local/
