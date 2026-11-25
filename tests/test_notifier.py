@@ -299,3 +299,27 @@ async def test_repair_issues(
     await _refresh(hass, entry)
     assert registry.async_get_issue(DOMAIN, f"not_sliced_{entry.entry_id}") is None
     assert registry.async_get_issue(DOMAIN, f"unmatched_{entry.entry_id}") is None
+
+
+async def test_unknown_color_suggests_nearest_or_new_spool(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    bambu: FakeTransport,
+    drive: FakeDrive,
+    sent: MagicMock,
+) -> None:
+    hass.config_entries.async_update_entry(entry, options={"notify_negative": False})
+    _spools(bambu, GREY)
+    drive.add("f2", "brick.gcode.3mf", build_3mf(slice_info([[("PLA", "#C12E1F", 4)]])))
+    drive.add("f3", "flex.gcode.3mf", build_3mf(slice_info([[("TPU", "#00FF00", 2)]])))
+    await _setup(hass, entry)
+    await _wait(hass)
+    message = _messages(sent)[0]
+    assert "Unknown color PLA #C12E1F in brick.gcode.3mf" in message
+    assert "Nearest in stock: PLA #898989" in message
+    assert "There is no TPU in stock" in message
+    assert "material TPU, color #00FF00" in message
+
+    await _refresh(hass, entry)
+    await _wait(hass)
+    assert len(sent.call_args_list) == 1

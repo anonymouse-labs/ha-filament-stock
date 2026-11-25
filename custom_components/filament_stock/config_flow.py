@@ -58,6 +58,7 @@ from .const import (
     CONF_NOTIFY_NEW_SPOOL,
     CONF_NOTIFY_NOT_SLICED,
     CONF_NOTIFY_TOKEN,
+    CONF_NOTIFY_UNMATCHED,
     CONF_QUEUE_INTERVAL,
     CONF_SERVICE_ACCOUNT,
     CONF_SPOOL_INTERVAL,
@@ -432,6 +433,10 @@ class FilamentStockOptionsFlow(OptionsFlowWithReload):
                         mode=NumberSelectorMode.BOX,
                     )
                 ),
+                probatio.Required(
+                    CONF_NOTIFY_UNMATCHED,
+                    default=current.get(CONF_NOTIFY_UNMATCHED, True),
+                ): BooleanSelector(),
                 probatio.Required(
                     CONF_NOTIFY_NOT_SLICED,
                     default=current.get(CONF_NOTIFY_NOT_SLICED, True),

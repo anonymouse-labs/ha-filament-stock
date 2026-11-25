@@ -355,6 +355,7 @@ async def test_options_flow_reloads(
         "notify_low": 100.0,
         "notify_not_sliced": False,
         "notify_token": True,
+        "notify_unmatched": True,
     }
     assert no_setup.call_count == calls + 1
 

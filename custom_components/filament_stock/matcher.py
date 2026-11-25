@@ -73,8 +73,13 @@ def match_color(
     fixed: Mapping[str, str] | None = None,
     nearest: bool = True,
     max_distance: float = DEFAULT_MAX_DISTANCE,
+    prefer_loaded: bool = False,
 ) -> Match:
-    """Match one file color. `fixed` maps 'MATERIAL|#RRGGBB' to a group id."""
+    """Match one file color. `fixed` maps 'MATERIAL|#RRGGBB' to a group id.
+
+    With `prefer_loaded` (used when booking a print) the groups with a spool in
+    the printer are tried first: the print used what was loaded.
+    """
     material = normalize_material(material)
     color = color.upper()
 
@@ -83,6 +88,22 @@ def match_color(
         return Match(material, color, target, MatchMethod.FIXED)
 
     same_material = [g for g in groups.values() if g.material == material]
+    if prefer_loaded:
+        scored_loaded = sorted(
+            (color_distance(color, g.color), g.id)
+            for g in same_material
+            if g.in_printer
+        )
+        if scored_loaded and scored_loaded[0][0] <= max_distance:
+            distance, group_id = scored_loaded[0]
+            return Match(
+                material,
+                color,
+                group_id,
+                MatchMethod.IN_PRINTER,
+                round(distance, 2),
+                tuple(gid for _, gid in scored_loaded),
+            )
     exact = sorted((g for g in same_material if g.color == color), key=lambda g: g.id)
     if len(exact) == 1:
         return Match(material, color, exact[0].id, MatchMethod.EXACT)
@@ -123,6 +144,7 @@ def map_needs(
     fixed: Mapping[str, str] | None = None,
     nearest: bool = True,
     max_distance: float = DEFAULT_MAX_DISTANCE,
+    prefer_loaded: bool = False,
 ) -> Needs:
     """Map grams per (material, color) to grams per group."""
     needs = Needs()
@@ -135,7 +157,21 @@ def map_needs(
             fixed=fixed,
             nearest=nearest,
             max_distance=max_distance,
+            prefer_loaded=prefer_loaded,
         )
         needs.matches[(match.material, match.color)] = match
         needs.grams[match.group_id] = needs.grams.get(match.group_id, 0.0) + grams
     return needs
+
+
+def nearest_group(
+    material: str, color: str, groups: Mapping[str, ColorGroup]
+) -> tuple[str, float] | None:
+    """Closest group of the same material, at any distance. For suggestions."""
+    material = normalize_material(material)
+    scored = sorted(
+        (color_distance(color, g.color), g.id)
+        for g in groups.values()
+        if g.material == material
+    )
+    return (scored[0][1], round(scored[0][0], 1)) if scored else None

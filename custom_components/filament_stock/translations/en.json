@@ -92,13 +92,15 @@
           "notify_negative": "Balance below 0 g",
           "notify_low": "Balance below (0 = off)",
           "notify_not_sliced": "Unsliced file in the folder",
-          "notify_token": "Bambu Lab sign-in expires soon"
+          "notify_token": "Bambu Lab sign-in expires soon",
+          "notify_unmatched": "Unknown color in the queue"
         },
         "data_description": {
           "notify_entity": "Needed for 'Notify entity'. A WhatsApp Notifier chat is a notify entity too.",
           "notify_chat_id": "Only for WhatsApp Notifier. Leave empty for its default chat.",
           "notify_new_spool": "Includes a reminder to check the weight.",
-          "notify_low": "One message when a color group drops below this many grams."
+          "notify_low": "One message when a color group drops below this many grams.",
+          "notify_unmatched": "With the nearest color in stock, or how to add the spool in Bambu Studio."
         }
       }
     },
@@ -160,6 +162,12 @@
     },
     "notify_token": {
       "message": "The Bambu Lab sign-in expires in {days} days. Open Filament Stock and choose Reconfigure > Sign in again."
+    },
+    "notify_unmatched_nearest": {
+      "message": "Unknown color {color} in {files}. Nearest in stock: {nearest} (distance {distance}). Choose the right spool in Home Assistant under '{color} in files', or add the spool in Bambu Studio > Filament Manager: material {material}, color {hex}."
+    },
+    "notify_unmatched_new": {
+      "message": "Unknown color {color} in {files}. There is no {material} in stock. Add the spool in Bambu Studio > Filament Manager: material {material}, color {hex}."
     }
   },
   "entity": {
@@ -201,6 +209,14 @@
     "number": {
       "stock": {
         "name": "{group} stock"
+      }
+    },
+    "select": {
+      "file_color": {
+        "name": "{color} in files",
+        "state": {
+          "auto": "Automatic"
+        }
       }
     }
   },

@@ -92,13 +92,15 @@
           "notify_negative": "Saldo onder 0 g",
           "notify_low": "Saldo onder (0 = uit)",
           "notify_not_sliced": "Niet-gesliceerd bestand in de map",
-          "notify_token": "Inlog bij Bambu Lab verloopt binnenkort"
+          "notify_token": "Inlog bij Bambu Lab verloopt binnenkort",
+          "notify_unmatched": "Onbekende kleur in de wachtrij"
         },
         "data_description": {
           "notify_entity": "Nodig bij 'Notify-entiteit'. Een chat van WhatsApp Notifier is ook een notify-entiteit.",
           "notify_chat_id": "Alleen voor WhatsApp Notifier. Leeg laten voor de standaardchat.",
           "notify_new_spool": "Met een herinnering om het gewicht te controleren.",
-          "notify_low": "Eén melding als een kleurgroep onder dit aantal gram zakt."
+          "notify_low": "Eén melding als een kleurgroep onder dit aantal gram zakt.",
+          "notify_unmatched": "Met de dichtstbijzijnde kleur op voorraad, of hoe je de spoel aanmaakt in Bambu Studio."
         }
       }
     },
@@ -160,6 +162,12 @@
     },
     "notify_token": {
       "message": "De inlog bij Bambu Lab verloopt over {days} dagen. Open Filament Stock en kies Opnieuw configureren > Opnieuw inloggen."
+    },
+    "notify_unmatched_nearest": {
+      "message": "Onbekende kleur {color} in {files}. Dichtstbijzijnde op voorraad: {nearest} (afstand {distance}). Kies de juiste spoel in Home Assistant bij '{color} in bestanden', of maak de spoel aan in Bambu Studio > Filamentbeheer: materiaal {material}, kleur {hex}."
+    },
+    "notify_unmatched_new": {
+      "message": "Onbekende kleur {color} in {files}. Er staat geen {material} op voorraad. Maak de spoel aan in Bambu Studio > Filamentbeheer: materiaal {material}, kleur {hex}."
     }
   },
   "entity": {
@@ -201,6 +209,14 @@
     "number": {
       "stock": {
         "name": "{group} voorraad"
+      }
+    },
+    "select": {
+      "file_color": {
+        "name": "{color} in bestanden",
+        "state": {
+          "auto": "Automatisch"
+        }
       }
     }
   },

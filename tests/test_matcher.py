@@ -164,3 +164,33 @@ def test_map_needs_merges_into_one_group() -> None:
     groups = build_groups([spool(1, "#000000")])
     usage = {("PLA", "#000000"): 1.0, ("PLA", "#050505"): 2.0}
     assert map_needs(usage, groups, {}).grams == {"pla_000000": 3.0}
+
+
+def test_booking_prefers_the_loaded_spool() -> None:
+    """Three greys in stock, the file says one grey: the loaded grey is used."""
+    groups = build_groups(
+        [
+            spool(1, "#898989"),
+            spool(2, "#808080", in_printer=True),
+            spool(3, "#A0A0A0"),
+        ]
+    )
+    planned = match_color("PLA", "#898989", groups, {})
+    assert planned.group_id == "pla_898989"
+    booked = match_color("PLA", "#898989", groups, {}, prefer_loaded=True)
+    assert booked.method is MatchMethod.IN_PRINTER
+    assert booked.group_id == "pla_808080"
+
+
+def test_booking_ignores_a_loaded_spool_of_another_color() -> None:
+    groups = build_groups([spool(1, "#898989"), spool(2, "#FF3300", in_printer=True)])
+    booked = match_color("PLA", "#898989", groups, {}, prefer_loaded=True)
+    assert booked.method is MatchMethod.EXACT
+    assert booked.group_id == "pla_898989"
+
+
+def test_fixed_mapping_beats_loaded_spool() -> None:
+    groups = build_groups([spool(1, "#898989"), spool(2, "#808080", in_printer=True)])
+    fixed = {fixed_key("PLA", "#898989"): "pla_898989"}
+    booked = match_color("PLA", "#898989", groups, {}, fixed=fixed, prefer_loaded=True)
+    assert booked.group_id == "pla_898989"

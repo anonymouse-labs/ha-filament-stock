@@ -20,6 +20,7 @@ CONF_NOTIFY_NEW_SPOOL: Final = "notify_new_spool"
 CONF_NOTIFY_NEGATIVE: Final = "notify_negative"
 CONF_NOTIFY_LOW: Final = "notify_low"
 CONF_NOTIFY_NOT_SLICED: Final = "notify_not_sliced"
+CONF_NOTIFY_UNMATCHED: Final = "notify_unmatched"
 CONF_NOTIFY_TOKEN: Final = "notify_token"  # noqa: S105 - config key name
 
 METHOD_PERSISTENT: Final = "persistent"

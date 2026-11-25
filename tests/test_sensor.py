@@ -429,3 +429,38 @@ async def test_old_stock_sensors_are_removed(
     await _setup(hass, entry)
     assert er.async_get(hass).async_get(old) is None
     assert _value(hass, entry, "pla_000000_stock") == 1000
+
+
+async def test_file_color_select(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, plate: FakeDrive
+) -> None:
+    _spools(bambu, BLACK, GREY)
+    await _setup(hass, entry)
+    select = er.async_get(hass).async_get_entity_id(
+        "select", DOMAIN, f"{entry.entry_id}_pla_101410_file_color"
+    )
+    state = hass.states.get(select)
+    assert state.state == "auto"
+    assert state.attributes["options"] == ["auto", "PLA #000000", "PLA #898989"]
+    assert state.attributes["counted_as"] == "PLA #000000"
+    assert state.attributes["method"] == "nearest"
+    assert state.attributes["files"] == ["plate.gcode.3mf"]
+    assert state.name == "Filament Stock PLA #101410 in files"
+
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": select, "option": "PLA #898989"},
+        blocking=True,
+    )
+    assert hass.states.get(select).state == "PLA #898989"
+    assert _value(hass, entry, "pla_898989_needed") == pytest.approx(26.1)
+    assert _value(hass, entry, "pla_000000_needed") == 0
+
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": select, "option": "auto"},
+        blocking=True,
+    )
+    assert _value(hass, entry, "pla_000000_needed") == pytest.approx(15.0)

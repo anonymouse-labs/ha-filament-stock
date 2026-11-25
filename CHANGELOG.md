@@ -23,4 +23,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Notifications for new spools, negative or low balance, unsliced files and token expiry; via WhatsApp Notifier, any notify entity or a persistent notification. Each event once, combined and rate limited.
 - Repair issues for unsliced files and file colors without a spool.
 - Stock per color group is a number entity that can be changed in Home Assistant, as a local correction until the cloud weight changes.
+- Select per color in the queue to choose the spool it counts against; notification for unknown colors with the nearest spool or the color code to add in Bambu Studio.
+- Booking a print prefers the spool that is in the printer.
 - Own brand icon, README with setup guide, security policy, contributing guide and issue templates.

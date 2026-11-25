@@ -151,10 +151,14 @@ Entity IDs depend on your colors and language. Check them under **Settings > Dev
 
 The color in a sliced file is the color of the filament profile in your project. It is not always exactly the color of a spool in your list. Each file color `(material, #RRGGBB)` is matched like this:
 
-1. A **fixed mapping** set with `filament_stock.map_color`.
+1. A **fixed choice**: the select `… in files` that Filament Stock adds for every color in the queue (or the action `filament_stock.map_color`).
 2. A group with the **same material and color**. If there are several (same color, different note), the group with a spool in the printer wins, else the group with the most stock. The choice is shown in the `file_colors` attribute.
 3. Optional (on by default): the **nearest color** of the same material within a maximum distance. The distance is [CIEDE2000](https://en.wikipedia.org/wiki/Color_difference#CIEDE2000), which follows how people see color differences. About 2 is barely visible, 10 (the default) is a clearly similar shade. Example: a project color `#101410` (near black) matches a black spool.
-4. **No match**: the color gets an `unknown` group with a negative balance, the **Unmatched colors** sensor and a repair issue.
+4. **No match**: the color gets an `unknown` group with a negative balance, the **Unmatched colors** sensor, a repair issue and a notification. The notification names the nearest spool in stock, or tells you to add the spool in Bambu Studio > Filament Manager with the exact material and color code.
+
+**Choosing in Home Assistant.** Bambu Studio only lets you slice with filaments in your AMS. For a plate you will print later with another filament, pick the right spool in the select `<color> in files` (for example `PLA #898989 in files` > `PLA #FF3300 Army Red`). It stays `Automatic` otherwise. The attributes show which files use the color, how it is counted now and the nearest spool.
+
+**When a print is booked**, the spools that are in the printer (`inPrinter` in the Bambu Lab cloud) are tried first: the nearest loaded spool of the same material within the maximum distance gets the filament. With three greys in stock and one grey in the AMS, the loaded grey is booked. A fixed choice still wins.
 
 ## Deduction rules
 
@@ -181,7 +185,7 @@ Under **Configure** choose how to be notified:
 - **Any notify entity**: a WhatsApp Notifier chat, the mobile app, and so on.
 - **Home Assistant notification**: a persistent notification. Also used when sending fails.
 
-Each kind can be switched on or off: new spool found (with a reminder to check its weight), balance below 0 g, balance below a threshold, unsliced file in the folder, Bambu Lab sign-in expires soon.
+Each kind can be switched on or off: new spool found (with a reminder to check its weight), balance below 0 g, balance below a threshold, unknown color in the queue (with the nearest spool or the color code to add in Bambu Studio), unsliced file in the folder, Bambu Lab sign-in expires soon.
 
 Each event is sent once. A balance alert comes back only after the balance recovered and drops again. Events within 30 seconds are combined, and at most 20 messages per minute are sent. Texts follow the language of Home Assistant (English and Dutch).
 

@@ -29,6 +29,7 @@ from .const import (
     CONF_NOTIFY_NEW_SPOOL,
     CONF_NOTIFY_NOT_SLICED,
     CONF_NOTIFY_TOKEN,
+    CONF_NOTIFY_UNMATCHED,
     CONF_TOKEN_EXPIRES,
     DOMAIN,
     METHOD_NOTIFY_ENTITY,
@@ -63,6 +64,7 @@ class Notifier:
         self.negative: set[str] = set()
         self.low: set[str] = set()
         self.not_sliced: set[str] = set()
+        self.unmatched: set[str] = set()
         self.token_warned: float = 0
         self.pending: list[str] = []
         self.sent: deque[float] = deque()
@@ -77,6 +79,7 @@ class Notifier:
         self.negative = set(stored.get("negative", []))
         self.low = set(stored.get("low", []))
         self.not_sliced = set(stored.get("not_sliced", []))
+        self.unmatched = set(stored.get("unmatched", []))
         self.token_warned = float(stored.get("token_warned", 0))
         translations = await async_get_translations(
             self.hass, self.hass.config.language, "exceptions", [DOMAIN]
@@ -93,6 +96,7 @@ class Notifier:
             "negative": sorted(self.negative),
             "low": sorted(self.low),
             "not_sliced": sorted(self.not_sliced),
+            "unmatched": sorted(self.unmatched),
             "token_warned": self.token_warned,
         }
 
@@ -161,6 +165,16 @@ class Notifier:
             self.negative.discard(gone)
             self.low.discard(gone)
 
+        unmatched = {
+            key: color
+            for key, color in manager.file_colors.items()
+            if not color.match.matched
+        }
+        for key in sorted(set(unmatched) - self.unmatched):
+            if options.get(CONF_NOTIFY_UNMATCHED, True):
+                lines.append(self._unmatched_text(unmatched[key]))
+        self.unmatched = set(unmatched)
+
         files = set(manager.queue.data.not_sliced) if manager.queue.data else set()
         for name in sorted(files - self.not_sliced):
             if options.get(CONF_NOTIFY_NOT_SLICED, True):
@@ -178,6 +192,21 @@ class Notifier:
         if lines:
             self.pending.extend(lines)
             self._schedule(COALESCE_SECONDS)
+
+    def _unmatched_text(self, color: Any) -> str:
+        values = {
+            "color": color.label,
+            "material": color.match.material,
+            "hex": color.match.color,
+            "files": ", ".join(color.files[:3]) or "-",
+        }
+        if color.suggestion:
+            group_id, distance = color.suggestion
+            item = self._manager.state.get(group_id)
+            values["nearest"] = item.label if item else group_id
+            values["distance"] = f"{distance:g}"
+            return self._text("unmatched_nearest", **values)
+        return self._text("unmatched_new", **values)
 
     def _new_spools(self, spool_ids: list[int]) -> list[str]:
         lines = []

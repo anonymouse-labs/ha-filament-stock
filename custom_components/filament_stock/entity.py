@@ -79,8 +79,9 @@ def async_track_groups(
     kinds: tuple[str, ...],
     add: Callable[[Iterable[Entity]], None],
     factory: Callable[[str, str], Entity],
+    keys: Callable[[], set[str]] | None = None,
 ) -> Callable[[], None]:
-    """Add entities for new groups; remove those of vanished groups."""
+    """Add entities for new keys (groups by default); remove vanished ones."""
     registry = er.async_get(hass)
     prefix = f"{entry.entry_id}_"
     known: set[str] = set()
@@ -96,7 +97,7 @@ def async_track_groups(
 
     @callback
     def _sync() -> None:
-        current = set(manager.state)
+        current = keys() if keys else set(manager.state)
         if new := current - known:
             add(factory(group_id, kind) for group_id in sorted(new) for kind in kinds)
         if not manager.ready:

@@ -23,7 +23,8 @@ from .const import (
     STORAGE_VERSION,
 )
 from .ledger import Deduction, Ledger, SyncResult
-from .matcher import Match, Needs, fixed_key, map_needs
+from .matcher import Match, Needs, fixed_key, map_needs, nearest_group
+from .models import GroupKey
 from .print_queue import QueueCoordinator
 from .spools import SpoolCoordinator
 
@@ -59,6 +60,20 @@ class GroupState:
         return " ".join(p for p in (self.material, self.color, self.note) if p)
 
 
+@dataclass(slots=True)
+class FileColor:
+    """A color used by sliced files in the queue, and how it is counted."""
+
+    key: str  # stable id, e.g. 'pla_c12e1f'
+    match: Match
+    files: list[str]
+    suggestion: tuple[str, float] | None  # nearest group at any distance
+
+    @property
+    def label(self) -> str:
+        return f"{self.match.material} {self.match.color}"
+
+
 def _source(match: Match) -> dict[str, Any]:
     source: dict[str, Any] = {"color": match.color, "method": match.method.value}
     if match.distance is not None:
@@ -91,6 +106,7 @@ class StockManager:
         self.unknown_meta: dict[str, tuple[str, str]] = {}
         self.state: dict[str, GroupState] = {}
         self.needs = Needs()
+        self.file_colors: dict[str, FileColor] = {}
         self.last_sync: SyncResult | None = None
         # True once each source holds real data (stored or freshly fetched).
         self.spools_ready = False
@@ -178,7 +194,9 @@ class StockManager:
 
     # Computation
 
-    def _map(self, usage: dict[tuple[str, str], float]) -> Needs:
+    def _map(
+        self, usage: dict[tuple[str, str], float], prefer_loaded: bool = False
+    ) -> Needs:
         """Map grams per file color to grams per color group."""
         groups = self.spools.data.groups if self.spools.data else {}
         options = self._entry.options
@@ -189,6 +207,7 @@ class StockManager:
             fixed=self.fixed,
             nearest=options.get(CONF_MATCH_NEAREST, True),
             max_distance=options.get(CONF_MATCH_DISTANCE, DEFAULT_MATCH_DISTANCE),
+            prefer_loaded=prefer_loaded,
         )
 
     def _recompute(self) -> None:
@@ -232,6 +251,37 @@ class StockManager:
             item.needed = self.needs.grams.get(group_id, 0.0)
         self.unknown_meta = {k: v for k, v in self.unknown_meta.items() if k in state}
         self.state = state
+        self.file_colors = self._file_colors(groups)
+
+    def _file_colors(self, groups: dict[str, Any]) -> dict[str, FileColor]:
+        files: dict[tuple[str, str], list[str]] = {}
+        for item in self.queue.data.sliced if self.queue.data else []:
+            if item.parsed is None:
+                continue
+            for color_key in item.parsed.usage():
+                files.setdefault(color_key, []).append(item.name)
+        result: dict[str, FileColor] = {}
+        for (material, color), match in self.needs.matches.items():
+            key = GroupKey.of(material, color, "").id
+            result[key] = FileColor(
+                key=key,
+                match=match,
+                files=sorted(files.get((material, color), [])),
+                suggestion=nearest_group(material, color, groups),
+            )
+        return result
+
+    def group_choices(self) -> dict[str, str]:
+        """Label to group id, for picking a group in the UI. Spool groups only."""
+        choices: dict[str, str] = {}
+        for group_id, item in sorted(self.state.items(), key=lambda kv: kv[1].label):
+            if item.unknown:
+                continue
+            label = item.label
+            if label in choices:
+                label = f"{label} ({group_id})"
+            choices[label] = group_id
+        return choices
 
     @property
     def total_stock(self) -> float:
@@ -247,7 +297,7 @@ class StockManager:
         self, job_id: str, usage: dict[tuple[str, str], float]
     ) -> tuple[Deduction, Needs]:
         """Deduct a print from the ledger and save at once."""
-        mapped = self._map(usage)
+        mapped = self._map(usage, prefer_loaded=True)
         for match in mapped.unmatched:
             self.unknown_meta[match.group_id] = (match.material, match.color)
         groups = self.spools.data.groups if self.spools.data else {}
