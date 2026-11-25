@@ -27,4 +27,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Booking a print prefers the spool that is in the printer.
 - Last deduction lists colors that match two loaded spools equally (`ambiguous`). README section on linking spools to the AMS.
 - Last deduction names the grams per color group like the stock list (for example `PLA · DHM00001 Zwart`) instead of the raw file color.
+- Color group entities have `r`, `g` and `b` attributes (0 to 255) for color pickers that ask for decimal values.
 - Own brand icon, README with setup guide, security policy, contributing guide and issue templates.

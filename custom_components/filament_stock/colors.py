@@ -27,6 +27,18 @@ def normalize_hex(value: str | None) -> str | None:
     return f"#{match.group(1).upper()}"
 
 
+def hex_to_rgb(value: str | None) -> tuple[int, int, int] | None:
+    """Return (red, green, blue) as 0-255 integers, or None when not a color."""
+    normalized = normalize_hex(value)
+    if normalized is None:
+        return None
+    return (
+        int(normalized[1:3], 16),
+        int(normalized[3:5], 16),
+        int(normalized[5:7], 16),
+    )
+
+
 def _srgb_to_linear(channel: float) -> float:
     if channel <= 0.04045:
         return channel / 12.92
@@ -35,10 +47,10 @@ def _srgb_to_linear(channel: float) -> float:
 
 def hex_to_lab(value: str) -> Lab:
     """Convert '#RRGGBB' to CIE L*a*b* (D65 white point)."""
-    normalized = normalize_hex(value)
-    if normalized is None:
+    rgb = hex_to_rgb(value)
+    if rgb is None:
         raise ValueError(f"not a hex color: {value!r}")
-    r, g, b = (_srgb_to_linear(int(normalized[i : i + 2], 16) / 255) for i in (1, 3, 5))
+    r, g, b = (_srgb_to_linear(channel / 255) for channel in rgb)
     x = (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047
     y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b
     z = (0.0193339 * r + 0.1191920 * g + 0.9503041 * b) / 1.08883

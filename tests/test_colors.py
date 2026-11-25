@@ -6,6 +6,7 @@ from custom_components.filament_stock.colors import (
     ciede2000,
     color_distance,
     hex_to_lab,
+    hex_to_rgb,
     normalize_hex,
 )
 
@@ -28,6 +29,28 @@ from custom_components.filament_stock.colors import (
 )
 def test_normalize_hex(value: str | None, expected: str | None) -> None:
     assert normalize_hex(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("#996633", (153, 102, 51)),
+        ("996633", (153, 102, 51)),
+        ("#996633FF", (153, 102, 51)),
+        ("996633ff", (153, 102, 51)),
+        ("#fcecd6", (252, 236, 214)),
+        ("#000000", (0, 0, 0)),
+        ("#FFFFFF", (255, 255, 255)),
+        ("", None),
+        (None, None),
+        ("#12345", None),
+        ("#GGGGGG", None),
+        ("#1234567", None),
+        ("rood", None),
+    ],
+)
+def test_hex_to_rgb(value: str | None, expected: tuple[int, int, int] | None) -> None:
+    assert hex_to_rgb(value) == expected
 
 
 # Reference pairs from Sharma, Wu and Dalal (2005), "The CIEDE2000

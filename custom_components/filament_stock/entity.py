@@ -11,6 +11,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import Entity
 
+from .colors import hex_to_rgb
 from .const import DOMAIN, REPO_URL
 from .stock import GroupState, StockManager
 
@@ -64,6 +65,9 @@ class GroupEntity(FilamentStockEntity):
             "color": item.color,
             "note": item.note,
         }
+        # Decimal channels for color pickers that ask for red, green and blue.
+        if rgb := hex_to_rgb(item.color):
+            attrs["r"], attrs["g"], attrs["b"] = rgb
         if item.unknown:
             attrs["unknown"] = True
         return attrs

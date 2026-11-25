@@ -99,6 +99,17 @@ async def test_reference_plate_balance(
     state = hass.states.get(_entity(hass, entry, "pla_000000_balance"))
     assert state.attributes["material"] == "PLA"
     assert state.attributes["color"] == "#000000"
+    assert (state.attributes["r"], state.attributes["g"], state.attributes["b"]) == (
+        0,
+        0,
+        0,
+    )
+    grey = hass.states.get(_entity(hass, entry, "pla_898989_stock"))
+    assert (grey.attributes["r"], grey.attributes["g"], grey.attributes["b"]) == (
+        137,
+        137,
+        137,
+    )
     assert state.attributes["spools"][0]["name"] == "PLA Basic"
     assert state.attributes["file_colors"][0]["method"] == "nearest"
     assert state.attributes["unit_of_measurement"] == "g"
@@ -464,3 +475,50 @@ async def test_file_color_select(
         blocking=True,
     )
     assert _value(hass, entry, "pla_000000_needed") == pytest.approx(15.0)
+
+
+async def test_every_needed_color_gets_a_queue_select(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, plate: FakeDrive
+) -> None:
+    """A color with grams in the queue always has a live select, also when added later.
+
+    The queue color list on the dashboard is built from these selects.
+    """
+    brown = {
+        "id": 9,
+        "color": "#996633FF",
+        "filamentType": "PLA",
+        "note": "DFP14514 Wood-Brown mat",
+        "netWeight": 1000,
+        "totalNetWeight": 1000,
+    }
+    _spools(bambu, BLACK, GREY, brown)
+    await _setup(hass, entry)
+    plate.add(
+        "f2",
+        "brown.gcode.3mf",
+        build_3mf(slice_info([[("PLA", "#996633", 226.08)]])),
+    )
+    await entry.runtime_data.queue.async_refresh()
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    manager = entry.runtime_data.manager
+    brown_id = GroupKey.of("PLA", "#996633", "DFP14514 Wood-Brown mat").id
+    assert _value(hass, entry, f"{brown_id}_needed") == pytest.approx(226.1)
+    registry = er.async_get(hass)
+    for material, color in manager.needs.matches:
+        key = GroupKey.of(material, color, "").id
+        select = registry.async_get_entity_id(
+            "select", DOMAIN, f"{entry.entry_id}_{key}_file_color"
+        )
+        assert select, color
+        state = hass.states.get(select)
+        assert state is not None
+        assert state.state != "unavailable", color
+    state = hass.states.get(
+        registry.async_get_entity_id(
+            "select", DOMAIN, f"{entry.entry_id}_pla_996633_file_color"
+        )
+    )
+    assert state.attributes["method"] == "exact"
+    assert state.attributes["files"] == ["brown.gcode.3mf"]
