@@ -96,13 +96,16 @@ def match_color(
         )
         if scored_loaded and scored_loaded[0][0] <= max_distance:
             distance, group_id = scored_loaded[0]
+            # Loaded groups at the same distance (same color, other note, e.g.
+            # matte and glossy) cannot be told apart from the file: flag them.
+            ties = tuple(gid for d, gid in scored_loaded if d - distance < 0.01)
             return Match(
                 material,
                 color,
                 group_id,
                 MatchMethod.IN_PRINTER,
                 round(distance, 2),
-                tuple(gid for _, gid in scored_loaded),
+                ties if len(ties) > 1 else (),
             )
     exact = sorted((g for g in same_material if g.color == color), key=lambda g: g.id)
     if len(exact) == 1:

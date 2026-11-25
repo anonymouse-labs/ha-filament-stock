@@ -404,3 +404,73 @@ async def test_diagnostics_has_no_serial(
         )
     )
     assert state.attributes["printing"] is True
+
+
+def _cloud(spool_id: int, color: str, note: str, slot: int | None = None) -> dict:
+    """Spool as the cloud returns it; slot is the AMS slot when loaded."""
+    loaded = slot is not None
+    return {
+        "id": spool_id,
+        "color": f"{color}FF",
+        "filamentType": "PLA",
+        "note": note,
+        "netWeight": 1000,
+        "totalNetWeight": 1000,
+        "inPrinter": loaded,
+        "amsId": 0 if loaded else None,
+        "slotId": str(slot) if loaded else "",
+    }
+
+
+def _two_color_print(
+    setup_data: FakeDrive, bambu: FakeTransport, *spools: dict
+) -> None:
+    bambu.routes.pop(("GET", FILAMENT_PATH), None)
+    bambu.json("GET", FILAMENT_PATH, {"total": len(spools), "hits": list(spools)})
+    setup_data.listing.clear()
+    plate = [("PLA", "#101410", 0.76), ("PLA", "#FFFFFF", 188.66)]
+    setup_data.add("f1", FILE, build_3mf(slice_info([plate])))
+
+
+async def test_books_the_loaded_spools_not_lookalikes(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    bambu: FakeTransport,
+    setup_data: FakeDrive,
+) -> None:
+    """Real setup: black and white in the AMS, a lookalike black and a glossy
+    white with the exact same hex on the shelf."""
+    _two_color_print(
+        setup_data,
+        bambu,
+        _cloud(10, "#101410", "black", slot=0),
+        _cloud(11, "#FFFFFF", "white matte", slot=3),
+        _cloud(12, "#000000", "black shelf"),
+        _cloud(13, "#FFFFFF", "white glossy"),
+    )
+    await _setup(hass, entry)
+    await _start(hass)
+    await _status(hass, "finish")
+    assert _remaining(entry) == {10: 999.24, 11: 811.34, 12: 1000, 13: 1000}
+    assert _last(entry)["ambiguous"] == {}
+
+
+async def test_two_loaded_spools_with_the_same_color_are_flagged(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    bambu: FakeTransport,
+    setup_data: FakeDrive,
+) -> None:
+    _two_color_print(
+        setup_data,
+        bambu,
+        _cloud(10, "#101410", "black", slot=0),
+        _cloud(11, "#FFFFFF", "white matte", slot=2),
+        _cloud(12, "#FFFFFF", "white glossy", slot=3),
+    )
+    await _setup(hass, entry)
+    await _start(hass)
+    await _status(hass, "finish")
+    flagged = _last(entry)["ambiguous"]
+    assert list(flagged) == ["PLA #FFFFFF"]
+    assert len(flagged["PLA #FFFFFF"]) == 2

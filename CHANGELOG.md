@@ -25,4 +25,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Stock per color group is a number entity that can be changed in Home Assistant, as a local correction until the cloud weight changes.
 - Select per color in the queue to choose the spool it counts against; notification for unknown colors with the nearest spool or the color code to add in Bambu Studio.
 - Booking a print prefers the spool that is in the printer.
+- Last deduction lists colors that match two loaded spools equally (`ambiguous`). README section on linking spools to the AMS.
 - Own brand icon, README with setup guide, security policy, contributing guide and issue templates.

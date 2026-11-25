@@ -364,6 +364,13 @@ class PrintTracker:
                     for key, m in mapped.matches.items()
                 },
                 groups={k: round(v, 2) for k, v in mapped.grams.items()},
+                # Two loaded spools with the same color: the file cannot tell
+                # which one was used. Choose it with the 'in files' select.
+                ambiguous={
+                    f"{m.material} {m.color}": list(m.candidates)
+                    for m in mapped.matches.values()
+                    if len(m.candidates) > 1
+                },
                 spools={str(k): round(v, 2) for k, v in result.per_spool.items()},
                 shortage={k: round(v, 2) for k, v in result.shortage.items()},
             )

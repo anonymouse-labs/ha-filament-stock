@@ -22,6 +22,7 @@ The Bambu Lab cloud is the source of your stock. Without a Bambu Lab account the
 - [Configuration](#configuration)
 - [Entities](#entities)
 - [Actions](#actions)
+- [Link your spools to the AMS](#link-your-spools-to-the-ams)
 - [Color matching](#color-matching)
 - [Deduction rules](#deduction-rules)
 - [Notifications](#notifications)
@@ -147,6 +148,27 @@ Entity IDs depend on your colors and language. Check them under **Settings > Dev
 | `filament_stock.map_color` | Always count a file color (`material`, `color`) against a chosen color group (any of its entities). Leave out `group` to remove the mapping. Admin only. |
 | `filament_stock.reset_ledger` | Forget the local usage of one spool (`spool_id`) or of a whole color group, and its correction. Admin only. |
 
+## Link your spools to the AMS
+
+This is what makes the right spool lose filament. Colors alone cannot tell a matte grey from a glossy grey, but the spool in an AMS slot can.
+
+**In Bambu Studio** (or Bambu Handy), for every slot that holds a spool from your filament list:
+
+1. Open the **AMS material settings** of the slot.
+2. Choose **Select filament**, open the **Filament Manager** tab and pick the spool that is really in that slot.
+3. Click **Confirm**. The spool now shows **In use** in the Filament Manager.
+
+Bambu Lab then stores for that spool that it is in the printer and in which slot (`inPrinter`, `amsId`, `slotId`), and sets the slot color to the color of the spool. Filament Stock reads this from the cloud. When you swap a spool, link the new one the same way, so the cloud and the printer agree.
+
+**When a print is booked**, Filament Stock first looks at the spools that are in the printer. Each color in the sliced file goes to the loaded spool of the same material that is nearest in color, within the maximum distance. A grey from the file is booked on the grey in the AMS, not on one of the other greys on your shelf, even when a shelf spool has exactly the color of the file.
+
+What this cannot do:
+
+- **Bambu Studio only lets you slice with filaments that are in your AMS.** A plate for a filament that is not loaded yet has the color of another filament. Choose what it really needs with the select `… in files`, see below. This only affects the **needed** and **balance** sensors, never what is deducted after a print.
+- **Two loaded spools with the same color** (for example matte and glossy white in two slots) cannot be told apart from the file. One of them is booked and the sensor **Last deduction** lists the color under `ambiguous`. Load them with a clearly different color, or choose with the select `… in files`.
+- The cloud only knows what you tell Bambu Studio or Bambu Handy. If you swap a spool without linking the new one, the old spool is booked.
+- This was tested with generic spools that you link yourself, as above. Spools with a Bambu Lab RFID tag have not been tested.
+
 ## Color matching
 
 The color in a sliced file is the color of the filament profile in your project. It is not always exactly the color of a spool in your list. Each file color `(material, #RRGGBB)` is matched like this:
@@ -158,7 +180,7 @@ The color in a sliced file is the color of the filament profile in your project.
 
 **Choosing in Home Assistant.** Bambu Studio only lets you slice with filaments in your AMS. For a plate you will print later with another filament, pick the right spool in the select `<color> in files` (for example `PLA #898989 in files` > `PLA #FF3300 Army Red`). It stays `Automatic` otherwise. The attributes show which files use the color, how it is counted now and the nearest spool.
 
-**When a print is booked**, the spools that are in the printer (`inPrinter` in the Bambu Lab cloud) are tried first: the nearest loaded spool of the same material within the maximum distance gets the filament. With three greys in stock and one grey in the AMS, the loaded grey is booked. A fixed choice still wins.
+A fixed choice always wins, also when a print is booked. Everything about booking is in [Link your spools to the AMS](#link-your-spools-to-the-ams).
 
 ## Deduction rules
 
@@ -173,7 +195,8 @@ The print is followed through the `print_status` sensor of ha-bambulab.
 | `offline`, `unknown`, `unavailable` | The job is kept, the printer may just be gone for a moment. |
 
 - The printed file is found by the `subtask_name` of the printer, compared to the file names (lower case, without `.gcode.3mf`, `.3mf` or `.gcode`, letters and digits only). Files that left the folder are remembered.
-- The plate number comes from the printer file name (`plate_2.gcode`). If it cannot be found, the total of the file is used and the **Last deduction** sensor says so (`whole_file`).
+- A file with one sliced plate needs no plate number. For a file with several plates, the plate comes from a printer file name like `plate_2.gcode` when the printer reports one. If it cannot be found, the total of the file is used and the **Last deduction** sensor says so (`whole_file`).
+- The weight comes from the sliced file. It can differ a little from the weight the printer reports.
 - Within a color group, the spool in the printer is used first, then the spool with the least remaining, so opened spools get used up. When a group runs empty, the rest is booked as a shortage.
 - Every print is deducted once. The same end reported twice does nothing.
 
