@@ -563,7 +563,17 @@ async def test_one_select_per_color_shows_the_split_by_filament_id(
         )
     )
     assert state.attributes["files"] == ["022.gcode.3mf", "03.gcode.3mf"]
-    assert state.attributes["by_filament_id"] == {
-        "GFA01": "PLA #FFFFFF Ivory",
-        "GFL99": "PLA #FFFFFF Cotton",
-    }
+    assert state.attributes["split"] == [
+        {
+            "counted_as": "PLA #FFFFFF Ivory",
+            "method": "filament_id",
+            "filament_ids": ["GFA01"],
+            "files": ["022.gcode.3mf"],
+        },
+        {
+            "counted_as": "PLA #FFFFFF Cotton",
+            "method": "filament_id",
+            "filament_ids": ["GFL99"],
+            "files": ["03.gcode.3mf"],
+        },
+    ]

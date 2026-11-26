@@ -68,6 +68,7 @@ class FileColor:
     key: str  # stable id, e.g. 'pla_c12e1f'
     matches: dict[str, Match]  # by filament profile id ('' when the file has none)
     files: list[str]
+    files_by_id: dict[str, list[str]]
     suggestion: tuple[str, float] | None  # nearest group at any distance
 
     @property
@@ -260,25 +261,29 @@ class StockManager:
         self.file_colors = self._file_colors(groups)
 
     def _file_colors(self, groups: dict[str, Any]) -> dict[str, FileColor]:
-        files: dict[tuple[str, str], set[str]] = {}
+        files: dict[UsageKey, set[str]] = {}
         for item in self.queue.data.sliced if self.queue.data else []:
             if item.parsed is None:
                 continue
-            for material, color, _ in item.parsed.usage():
-                files.setdefault((material, color), set()).add(item.name)
+            for usage_key in item.parsed.usage():
+                files.setdefault(usage_key, set()).add(item.name)
         result: dict[str, FileColor] = {}
         # One entry per color: a fixed choice is per color, not per profile id.
         for (material, color, filament_id), match in self.needs.matches.items():
             key = GroupKey.of(material, color, "").id
-            if key in result:
-                result[key].matches[filament_id] = match
-                continue
-            result[key] = FileColor(
-                key=key,
-                matches={filament_id: match},
-                files=sorted(files.get((material, color), set())),
-                suggestion=nearest_group(material, color, groups),
-            )
+            names = sorted(files.get((material, color, filament_id), set()))
+            if key not in result:
+                result[key] = FileColor(
+                    key=key,
+                    matches={},
+                    files=[],
+                    files_by_id={},
+                    suggestion=nearest_group(material, color, groups),
+                )
+            entry = result[key]
+            entry.matches[filament_id] = match
+            entry.files_by_id[filament_id] = names
+            entry.files = sorted({*entry.files, *names})
         return result
 
     def group_choices(self) -> dict[str, str]:
