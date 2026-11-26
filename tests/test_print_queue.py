@@ -55,8 +55,8 @@ async def test_reads_reference_plate(
     assert data.folder_name == "Print queue"
     assert data.plates == 1
     assert data.usage() == {
-        ("PLA", "#101410"): pytest.approx(15.02),
-        ("PLA", "#898989"): pytest.approx(11.12),
+        ("PLA", "#101410", ""): pytest.approx(15.02),
+        ("PLA", "#898989", ""): pytest.approx(11.12),
     }
 
 
@@ -167,7 +167,7 @@ async def test_moved_file_is_still_found(
     hit = queue.find(["/data/Metadata/12_Gear_BOX_spare_links_v2.gcode"])
     assert hit is not None
     assert hit[0] == PLATE_NAME
-    assert hit[1].usage()[("PLA", "#898989")] == pytest.approx(11.12)
+    assert hit[1].usage()[("PLA", "#898989", "")] == pytest.approx(11.12)
     assert queue.find([]) is None
     assert queue.find(["something else"]) is None
 
@@ -180,3 +180,29 @@ async def test_bad_service_account_fails_setup(hass: HomeAssistant) -> None:
     entry.add_to_hass(hass)
     assert not await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is ConfigEntryState.SETUP_ERROR
+
+
+async def test_cache_from_an_older_parser_is_parsed_again(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    drive: FakeDrive,
+    bambu: FakeTransport,
+    hass_storage: dict[str, Any],
+) -> None:
+    drive.add("f1", PLATE_NAME, SLICED)
+    old = {
+        "status": "ok",
+        "plates": [{"index": 1, "filaments": [[1, "PLA", "#898989", 1]]}],
+    }
+    hass_storage[f"{DOMAIN}.{entry.entry_id}.queue"] = {
+        "version": 1,
+        "minor_version": 1,
+        "key": f"{DOMAIN}.{entry.entry_id}.queue",
+        "data": {
+            "folder_name": "Print queue",
+            "files": {"f1": {"name": PLATE_NAME, "stamp": "1", "parsed": old}},
+        },
+    }
+    queue = await _setup(hass, entry)
+    assert drive.downloads == ["f1"]
+    assert queue.data.usage()[("PLA", "#898989", "")] == pytest.approx(11.12)

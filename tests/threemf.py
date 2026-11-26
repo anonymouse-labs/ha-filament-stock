@@ -8,18 +8,20 @@ import zipfile
 SLICE_INFO = "Metadata/slice_info.config"
 
 
-def slice_info(plates: list[list[tuple[str, str, float]]], index: bool = True) -> str:
-    """slice_info.config XML. Each plate is a list of (type, color, grams)."""
+def slice_info(plates: list[list[tuple]], index: bool = True) -> str:
+    """slice_info.config XML. Each plate is a list of (type, color, grams) or
+    (type, color, grams, filament profile id)."""
     parts = ['<?xml version="1.0" encoding="UTF-8"?>', "<config>"]
     for number, filaments in enumerate(plates, start=1):
         parts.append("  <plate>")
         if index:
             parts.append(f'    <metadata key="index" value="{number}"/>')
-        weight = round(sum(g for _, _, g in filaments), 2)
+        weight = round(sum(f[2] for f in filaments), 2)
         parts.append(f'    <metadata key="weight" value="{weight}"/>')
-        for slot, (kind, color, grams) in enumerate(filaments, start=1):
+        for slot, (kind, color, grams, *profile) in enumerate(filaments, start=1):
+            idx = f' tray_info_idx="{profile[0]}"' if profile else ""
             parts.append(
-                f'    <filament id="{slot}" type="{kind}" color="{color}" '
+                f'    <filament id="{slot}"{idx} type="{kind}" color="{color}" '
                 f'used_m="1.00" used_g="{grams}"/>'
             )
         parts.append("  </plate>")

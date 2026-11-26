@@ -91,6 +91,12 @@ class FileColorSelect(FilamentStockEntity, SelectEntity):
         }
         if match.distance is not None:
             attrs["distance"] = match.distance
+        if len({m.group_id for m in color.matches.values()}) > 1:
+            # Same color, other filament profile: counted on another group.
+            attrs["by_filament_id"] = {
+                fid or "-": self._label(m.group_id)
+                for fid, m in sorted(color.matches.items())
+            }
         if color.suggestion:
             attrs["nearest"] = self._label(color.suggestion[0])
             attrs["nearest_distance"] = color.suggestion[1]

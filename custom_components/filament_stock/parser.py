@@ -23,6 +23,10 @@ MAX_ZIP_ENTRIES = 10_000
 MAX_SLICE_INFO_BYTES = 2 * 1024 * 1024
 MAX_PLATES = 200
 MAX_FILAMENTS_PER_PLATE = 64
+# Bump when parsing changes: cached files are then downloaded and parsed again.
+PARSE_VERSION = 2
+
+UsageKey = tuple[str, str, str]  # (material, '#RRGGBB', filament id or '')
 
 
 class ParseStatus(StrEnum):
@@ -42,6 +46,7 @@ class FilamentUse:
     material: str
     color: str  # '#RRGGBB'
     grams: float
+    filament_id: str = ""  # slicer profile id, e.g. 'GFA01'; tells same colors apart
 
 
 @dataclass(slots=True)
@@ -67,27 +72,29 @@ class ParsedFile:
     def plate(self, index: int) -> Plate | None:
         return next((p for p in self.plates if p.index == index), None)
 
-    def usage(self, plate_index: int | None = None) -> dict[tuple[str, str], float]:
-        """Grams per (material, color) for one plate, or all plates when None."""
+    def usage(self, plate_index: int | None = None) -> dict[UsageKey, float]:
+        """Grams per (material, color, filament id) for one plate, or all plates."""
         plates = self.plates if plate_index is None else [self.plate(plate_index)]
-        totals: dict[tuple[str, str], float] = {}
+        totals: dict[UsageKey, float] = {}
         for plate in plates:
             if plate is None:
                 continue
             for use in plate.filaments:
-                key = (use.material, use.color)
+                key = (use.material, use.color, use.filament_id)
                 totals[key] = totals.get(key, 0.0) + use.grams
         return totals
 
     def as_dict(self) -> dict[str, Any]:
         return {
+            "version": PARSE_VERSION,
             "status": self.status.value,
             "plates": [
                 {
                     "index": p.index,
                     "weight": p.weight,
                     "filaments": [
-                        [f.slot, f.material, f.color, f.grams] for f in p.filaments
+                        [f.slot, f.material, f.color, f.grams, f.filament_id]
+                        for f in p.filaments
                     ],
                 }
                 for p in self.plates
@@ -103,8 +110,12 @@ class ParsedFile:
                     index=int(p["index"]),
                     weight=p.get("weight"),
                     filaments=[
-                        FilamentUse(int(s), str(m), str(c), float(g))
-                        for s, m, c, g in p["filaments"]
+                        FilamentUse(int(f[0]), str(f[1]), str(f[2]), float(f[3]))
+                        if len(f) == 4  # stored before PARSE_VERSION 2
+                        else FilamentUse(
+                            int(f[0]), str(f[1]), str(f[2]), float(f[3]), str(f[4])
+                        )
+                        for f in p["filaments"]
                     ],
                 )
                 for p in data.get("plates", [])
@@ -217,6 +228,7 @@ def parse_3mf(data: bytes) -> ParsedFile:
                     material=normalize_material(item.get("type")),
                     color=color,
                     grams=grams,
+                    filament_id=(item.get("tray_info_idx") or "").strip()[:32],
                 )
             )
         if plate.filaments:

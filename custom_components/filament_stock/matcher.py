@@ -3,20 +3,21 @@
 Pure Python, no Home Assistant imports. Order:
 1. A fixed mapping set by the user.
 2. Exact material and hex. Several groups (same hex, other note): the group
-   with a spool in the printer, else the group with the most stock.
+   whose spools have the file's filament profile id, then the group with a
+   spool in the printer, else the group with the most stock.
 3. Optional: nearest group of the same material within a CIEDE2000 distance.
 4. No match: an 'unknown' group. Never silently ignored.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
 from .colors import color_distance
 from .models import ColorGroup, GroupKey
-from .parser import normalize_material
+from .parser import UsageKey, normalize_material
 
 DEFAULT_MAX_DISTANCE = 10.0
 
@@ -26,6 +27,7 @@ class MatchMethod(StrEnum):
 
     FIXED = "fixed"
     EXACT = "exact"
+    FILAMENT_ID = "filament_id"
     IN_PRINTER = "in_printer"
     MOST_STOCK = "most_stock"
     NEAREST = "nearest"
@@ -53,7 +55,7 @@ class Needs:
     """Queue needs mapped to groups."""
 
     grams: dict[str, float] = field(default_factory=dict)  # group id -> grams
-    matches: dict[tuple[str, str], Match] = field(default_factory=dict)
+    matches: dict[UsageKey, Match] = field(default_factory=dict)
 
     @property
     def unmatched(self) -> list[Match]:
@@ -64,12 +66,22 @@ def unknown_group_id(material: str, color: str) -> str:
     return "unknown_" + GroupKey.of(material, color, "").id
 
 
+def _by_filament_id(
+    group_ids: Iterable[str], filament_id: str, groups: Mapping[str, ColorGroup]
+) -> list[str]:
+    """The groups with a spool of this profile id; all of them when none has it."""
+    ids = list(group_ids)
+    same = [g for g in ids if filament_id and filament_id in groups[g].filament_ids]
+    return same or ids
+
+
 def match_color(
     material: str,
     color: str,
     groups: Mapping[str, ColorGroup],
     stock: Mapping[str, float],
     *,
+    filament_id: str = "",
     fixed: Mapping[str, str] | None = None,
     nearest: bool = True,
     max_distance: float = DEFAULT_MAX_DISTANCE,
@@ -78,7 +90,8 @@ def match_color(
     """Match one file color. `fixed` maps 'MATERIAL|#RRGGBB' to a group id.
 
     With `prefer_loaded` (used when booking a print) the groups with a spool in
-    the printer are tried first: the print used what was loaded.
+    the printer are tried first: the print used what was loaded. The
+    `filament_id` from the file only chooses between groups of the same color.
     """
     material = normalize_material(material)
     color = color.upper()
@@ -95,23 +108,31 @@ def match_color(
             if g.in_printer
         )
         if scored_loaded and scored_loaded[0][0] <= max_distance:
-            distance, group_id = scored_loaded[0]
+            distance = scored_loaded[0][0]
             # Loaded groups at the same distance (same color, other note, e.g.
-            # matte and glossy) cannot be told apart from the file: flag them.
-            ties = tuple(gid for d, gid in scored_loaded if d - distance < 0.01)
+            # matte and glossy): the profile id may tell them apart, else flag them.
+            ties = _by_filament_id(
+                (gid for d, gid in scored_loaded if d - distance < 0.01),
+                filament_id,
+                groups,
+            )
             return Match(
                 material,
                 color,
-                group_id,
+                ties[0],
                 MatchMethod.IN_PRINTER,
                 round(distance, 2),
-                ties if len(ties) > 1 else (),
+                tuple(ties) if len(ties) > 1 else (),
             )
     exact = sorted((g for g in same_material if g.color == color), key=lambda g: g.id)
     if len(exact) == 1:
         return Match(material, color, exact[0].id, MatchMethod.EXACT)
     if exact:
         ids = tuple(g.id for g in exact)
+        same_id = _by_filament_id(ids, filament_id, groups)
+        if len(same_id) == 1:
+            return Match(material, color, same_id[0], MatchMethod.FILAMENT_ID)
+        exact = [groups[g] for g in same_id]
         loaded = [g for g in exact if g.in_printer]
         if len(loaded) == 1:
             return Match(
@@ -140,7 +161,7 @@ def fixed_key(material: str, color: str) -> str:
 
 
 def map_needs(
-    usage: Mapping[tuple[str, str], float],
+    usage: Mapping[UsageKey, float],
     groups: Mapping[str, ColorGroup],
     stock: Mapping[str, float],
     *,
@@ -149,20 +170,21 @@ def map_needs(
     max_distance: float = DEFAULT_MAX_DISTANCE,
     prefer_loaded: bool = False,
 ) -> Needs:
-    """Map grams per (material, color) to grams per group."""
+    """Map grams per (material, color, filament id) to grams per group."""
     needs = Needs()
-    for (material, color), grams in usage.items():
+    for (material, color, filament_id), grams in usage.items():
         match = match_color(
             material,
             color,
             groups,
             stock,
+            filament_id=filament_id,
             fixed=fixed,
             nearest=nearest,
             max_distance=max_distance,
             prefer_loaded=prefer_loaded,
         )
-        needs.matches[(match.material, match.color)] = match
+        needs.matches[(match.material, match.color, filament_id)] = match
         needs.grams[match.group_id] = needs.grams.get(match.group_id, 0.0) + grams
     return needs
 

@@ -167,7 +167,7 @@ Bambu Lab then stores for that spool that it is in the printer and in which slot
 What this cannot do:
 
 - **Bambu Studio only lets you slice with filaments that are in your AMS.** A plate for a filament that is not loaded yet has the color of another filament. Choose what it really needs with the select `… in files`, see below. This only affects the **needed** and **balance** sensors, never what is deducted after a print.
-- **Two loaded spools with the same color** (for example matte and glossy white in two slots) cannot be told apart from the file. One of them is booked and the sensor **Last deduction** lists the color under `ambiguous`. Load them with a clearly different color, or choose with the select `… in files`.
+- **Two loaded spools with the same color** (for example matte and glossy white in two slots) are told apart by the filament profile of the sliced file, when the two spools use different profiles in Bambu Studio (see [Color matching](#color-matching)). With the same profile, one of them is booked and the sensor **Last deduction** lists the color under `ambiguous`. Load them with a clearly different color, or choose with the select `… in files`.
 - The cloud only knows what you tell Bambu Studio or Bambu Handy. If you swap a spool without linking the new one, the old spool is booked.
 - This was tested with generic spools that you link yourself, as above. Spools with a Bambu Lab RFID tag have not been tested.
 
@@ -176,7 +176,9 @@ What this cannot do:
 The color in a sliced file is the color of the filament profile in your project. It is not always exactly the color of a spool in your list. Each file color `(material, #RRGGBB)` is matched like this:
 
 1. A **fixed choice**: the select `… in files` that Filament Stock adds for every color in the queue (or the action `filament_stock.map_color`).
-2. A group with the **same material and color**. If there are several (same color, different note), the group with a spool in the printer wins, else the group with the most stock. The choice is shown in the `file_colors` attribute.
+2. A group with the **same material and color**. If there are several (same color, different note), the group whose spool has the **filament profile** of the file wins, then the group with a spool in the printer, else the group with the most stock. The choice is shown in the `file_colors` attribute.
+
+**Same color, other spool.** Every filament in a sliced file carries the id of its filament profile, for example `GFL99` for Generic PLA or `GFA01` for Bambu PLA Matte. Bambu Studio takes the profile from the spool in the AMS when you slice. So a file sliced with Cotton White (`GFL99`) counts on Cotton White, and a file sliced with Ivory White (`GFA01`) counts on Ivory White, although both are `#FFFFFF`. This only works when the two spools have different profiles. A profile of your own (for example a copy named `PLA profiel Sterk`) has its own id that matches no spool: then the rules above and below apply. When a print is booked, the spool in the printer still decides, because that is what was used. The profile id only chooses between two loaded spools of the same color. The select `… in files` shows the split under `by_filament_id`.
 3. Optional (on by default): the **nearest color** of the same material within a maximum distance. The distance is [CIEDE2000](https://en.wikipedia.org/wiki/Color_difference#CIEDE2000), which follows how people see color differences. About 2 is barely visible, 10 (the default) is a clearly similar shade. Example: a project color `#101410` (near black) matches a black spool.
 4. **No match**: the color gets an `unknown` group with a negative balance, the **Unmatched colors** sensor, a repair issue and a notification. The notification names the nearest spool in stock, or tells you to add the spool in Bambu Studio > Filament Manager with the exact material and color code.
 

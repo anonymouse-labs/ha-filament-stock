@@ -33,7 +33,14 @@ from .drive import (
     DriveFile,
     DriveFileTooLarge,
 )
-from .parser import ParsedFile, ParseStatus, normalize_name, parse_3mf
+from .parser import (
+    PARSE_VERSION,
+    ParsedFile,
+    ParseStatus,
+    UsageKey,
+    normalize_name,
+    parse_3mf,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -89,9 +96,9 @@ class QueueData:
     def plates(self) -> int:
         return sum(len(f.parsed.plates) for f in self.sliced if f.parsed)
 
-    def usage(self) -> dict[tuple[str, str], float]:
-        """Grams per (material, color) over every sliced file."""
-        totals: dict[tuple[str, str], float] = {}
+    def usage(self) -> dict[UsageKey, float]:
+        """Grams per (material, color, filament id) over every sliced file."""
+        totals: dict[UsageKey, float] = {}
         for item in self.sliced:
             if item.parsed is None:
                 continue
@@ -131,10 +138,12 @@ class QueueCoordinator(DataUpdateCoordinator[QueueData]):
         for file_id, item in raw.get("files", {}).items():
             try:
                 parsed = item.get("parsed")
+                # An older parse is kept for now, a blank stamp fetches it again.
+                current = bool(parsed) and parsed.get("version") == PARSE_VERSION
                 files[file_id] = QueueFile(
                     id=file_id,
                     name=item["name"],
-                    stamp=item["stamp"],
+                    stamp=item["stamp"] if current else "",
                     parsed=ParsedFile.from_dict(parsed) if parsed else None,
                     error=item.get("error"),
                 )

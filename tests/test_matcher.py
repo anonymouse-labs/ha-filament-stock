@@ -144,25 +144,25 @@ def test_no_groups_is_unknown() -> None:
 
 def test_map_needs_reference_plate() -> None:
     groups = build_groups([spool(1, "#000000"), spool(2, "#898989")])
-    usage = {("PLA", "#101410"): 15.02, ("PLA", "#898989"): 11.12}
+    usage = {("PLA", "#101410", ""): 15.02, ("PLA", "#898989", ""): 11.12}
     needs = map_needs(usage, groups, {})
     assert needs.grams == {
         "pla_000000": pytest.approx(15.02),
         "pla_898989": pytest.approx(11.12),
     }
     assert needs.unmatched == []
-    assert needs.matches[("PLA", "#101410")].method is MatchMethod.NEAREST
+    assert needs.matches[("PLA", "#101410", "")].method is MatchMethod.NEAREST
 
 
 def test_map_needs_reports_unmatched() -> None:
-    needs = map_needs({("PETG", "#FF0000"): 4.0}, {}, {})
+    needs = map_needs({("PETG", "#FF0000", ""): 4.0}, {}, {})
     assert needs.grams == {"unknown_petg_ff0000": 4.0}
     assert [m.color for m in needs.unmatched] == ["#FF0000"]
 
 
 def test_map_needs_merges_into_one_group() -> None:
     groups = build_groups([spool(1, "#000000")])
-    usage = {("PLA", "#000000"): 1.0, ("PLA", "#050505"): 2.0}
+    usage = {("PLA", "#000000", ""): 1.0, ("PLA", "#050505", ""): 2.0}
     assert map_needs(usage, groups, {}).grams == {"pla_000000": 3.0}
 
 
@@ -194,3 +194,53 @@ def test_fixed_mapping_beats_loaded_spool() -> None:
     fixed = {fixed_key("PLA", "#898989"): "pla_898989"}
     booked = match_color("PLA", "#898989", groups, {}, fixed=fixed, prefer_loaded=True)
     assert booked.group_id == "pla_898989"
+
+
+def _whites() -> dict:
+    """Cotton White is loaded, Ivory White waits on the shelf: same hex."""
+    return build_groups(
+        [
+            spool(1, "#FFFFFF", "Cotton", in_printer=True, filament_id="GFL99"),
+            spool(2, "#FFFFFF", "Ivory", filament_id="GFA01"),
+        ]
+    )
+
+
+def test_filament_id_tells_same_colors_apart_in_the_queue() -> None:
+    groups = _whites()
+    cotton = GroupKey.of("PLA", "#FFFFFF", "Cotton").id
+    ivory = GroupKey.of("PLA", "#FFFFFF", "Ivory").id
+    usage = {("PLA", "#FFFFFF", "GFL99"): 94.0, ("PLA", "#FFFFFF", "GFA01"): 368.0}
+    needs = map_needs(usage, groups, {})
+    assert needs.grams == {cotton: 94.0, ivory: 368.0}
+    assert needs.matches[("PLA", "#FFFFFF", "GFA01")].method is MatchMethod.FILAMENT_ID
+    # Unknown or missing id: the old rules, the loaded group wins.
+    for filament_id in ("GFA00", ""):
+        match = match_color("PLA", "#FFFFFF", groups, {}, filament_id=filament_id)
+        assert match.group_id == cotton
+
+
+def test_booking_keeps_the_loaded_spool_over_the_filament_id() -> None:
+    """Sliced for Ivory but printed with Cotton loaded: Cotton was used."""
+    groups = _whites()
+    booked = match_color(
+        "PLA", "#FFFFFF", groups, {}, filament_id="GFA01", prefer_loaded=True
+    )
+    assert booked.group_id == GroupKey.of("PLA", "#FFFFFF", "Cotton").id
+    assert booked.method is MatchMethod.IN_PRINTER
+
+
+def test_filament_id_resolves_two_loaded_spools_of_one_color() -> None:
+    groups = build_groups(
+        [
+            spool(1, "#FFFFFF", "Cotton", in_printer=True, filament_id="GFL99"),
+            spool(2, "#FFFFFF", "Ivory", in_printer=True, filament_id="GFA01"),
+        ]
+    )
+    booked = match_color(
+        "PLA", "#FFFFFF", groups, {}, filament_id="GFA01", prefer_loaded=True
+    )
+    assert booked.group_id == GroupKey.of("PLA", "#FFFFFF", "Ivory").id
+    assert booked.candidates == ()
+    unsure = match_color("PLA", "#FFFFFF", groups, {}, prefer_loaded=True)
+    assert len(unsure.candidates) == 2

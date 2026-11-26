@@ -17,8 +17,8 @@ def test_reference_plate() -> None:
     assert len(result.plates) == 1
     assert result.plates[0].weight == pytest.approx(26.14)
     assert result.usage() == {
-        ("PLA", "#101410"): pytest.approx(15.02),
-        ("PLA", "#898989"): pytest.approx(11.12),
+        ("PLA", "#101410", ""): pytest.approx(15.02),
+        ("PLA", "#898989", ""): pytest.approx(11.12),
     }
     assert sum(result.usage().values()) == pytest.approx(26.14)
 
@@ -27,10 +27,10 @@ def test_multiple_plates_and_plate_usage() -> None:
     data = build_3mf(slice_info([REFERENCE_PLATE, [("PETG", "#ff0000", 5.0)]]))
     result = parse_3mf(data)
     assert [p.index for p in result.plates] == [1, 2]
-    assert result.usage(2) == {("PETG", "#FF0000"): 5.0}
+    assert result.usage(2) == {("PETG", "#FF0000", ""): 5.0}
     assert result.usage(1) == {
-        ("PLA", "#101410"): pytest.approx(15.02),
-        ("PLA", "#898989"): pytest.approx(11.12),
+        ("PLA", "#101410", ""): pytest.approx(15.02),
+        ("PLA", "#898989", ""): pytest.approx(11.12),
     }
     assert result.usage(9) == {}
     assert len(result.usage()) == 3
@@ -44,7 +44,7 @@ def test_plate_index_falls_back_to_order() -> None:
 def test_same_color_on_two_slots_is_summed() -> None:
     plate = [("PLA", "#101410", 2.0), ("pla", "#101410FF", 3.0)]
     result = parse_3mf(build_3mf(slice_info([plate])))
-    assert result.usage() == {("PLA", "#101410"): 5.0}
+    assert result.usage() == {("PLA", "#101410", ""): 5.0}
 
 
 def test_project_file_without_slice_info_is_not_sliced() -> None:
@@ -66,7 +66,7 @@ def test_zero_and_bad_values_are_skipped() -> None:
         "</plate></config>"
     )
     result = parse_3mf(build_3mf(config))
-    assert result.usage() == {("PLA", "#111111"): 1.5}
+    assert result.usage() == {("PLA", "#111111", ""): 1.5}
     assert result.plates[0].filaments[0].slot == 0
 
 
@@ -110,7 +110,7 @@ def test_nested_filament_elements_are_found() -> None:
         '<filament id="1" type="PLA" color="#101410" used_g="2.5"/>'
         "</group></plate></config>"
     )
-    assert parse_3mf(build_3mf(config)).usage() == {("PLA", "#101410"): 2.5}
+    assert parse_3mf(build_3mf(config)).usage() == {("PLA", "#101410", ""): 2.5}
 
 
 def test_corrupt_bytes_never_raise() -> None:
@@ -192,3 +192,23 @@ def test_round_trip_dict() -> None:
 )
 def test_normalize_name(name: str, expected: str) -> None:
     assert parser.normalize_name(name) == expected
+
+
+def test_filament_profile_id_is_read_and_stored() -> None:
+    plate = [("PLA", "#FFFFFF", 94.09, "GFL99"), ("PLA", "#FFFFFF", 2.0, "GFA01")]
+    result = parse_3mf(build_3mf(slice_info([plate])))
+    assert result.usage() == {
+        ("PLA", "#FFFFFF", "GFL99"): pytest.approx(94.09),
+        ("PLA", "#FFFFFF", "GFA01"): pytest.approx(2.0),
+    }
+    assert ParsedFile.from_dict(result.as_dict()) == result
+
+
+def test_dict_from_before_the_profile_id_still_loads() -> None:
+    old = {
+        "status": "ok",
+        "plates": [
+            {"index": 1, "weight": 5.0, "filaments": [[1, "PLA", "#FFFFFF", 5]]}
+        ],
+    }
+    assert ParsedFile.from_dict(old).usage() == {("PLA", "#FFFFFF", ""): 5.0}

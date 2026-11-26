@@ -210,6 +210,7 @@ def parse_spool(hit: dict[str, Any]) -> Spool | None:
         total_weight=number("totalNetWeight"),
         in_printer=bool(hit.get("inPrinter")),
         updated_at=int(updated) if isinstance(updated, int | float) else None,
+        filament_id=str(hit.get("filamentId") or "").strip()[:32],
     )
 
 

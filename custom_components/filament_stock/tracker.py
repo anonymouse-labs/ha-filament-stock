@@ -36,7 +36,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, STORAGE_VERSION
-from .parser import ParsedFile, normalize_name
+from .parser import ParsedFile, UsageKey, normalize_name
 from .stock import StockManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -68,7 +68,8 @@ class Job:
     file: str | None = None
     plate: int | None = None
     whole_file: bool = False  # plate unknown: the total of the file is used
-    usage: list[tuple[str, str, float]] | None = None  # grams at 100 %
+    # (material, color, filament id, grams at 100 %)
+    usage: list[tuple[str, str, str, float]] | None = None
     progress: float = 0.0
     # Progress counts only after 'running': before that it is stale.
     running: bool = False
@@ -88,7 +89,11 @@ class Job:
             file=data.get("file"),
             plate=data.get("plate"),
             whole_file=bool(data.get("whole_file", False)),
-            usage=[(str(m), str(c), float(g)) for m, c, g in usage]
+            # Jobs stored before the filament id have three fields.
+            usage=[
+                (str(u[0]), str(u[1]), str(u[2]) if len(u) == 4 else "", float(u[-1]))
+                for u in usage
+            ]
             if usage is not None
             else None,
             progress=float(data.get("progress", 0.0)),
@@ -105,7 +110,7 @@ def snapshot(parsed: ParsedFile, plate: int | None) -> tuple[list, int | None, b
     else:
         chosen = None
     usage = parsed.usage(chosen)
-    return [(m, c, g) for (m, c), g in usage.items()], chosen, chosen is None
+    return [(m, c, f, g) for (m, c, f), g in usage.items()], chosen, chosen is None
 
 
 class PrintTracker:
@@ -348,11 +353,10 @@ class PrintTracker:
             self._set_last(job, "no_match", status=status)
         else:
             fraction = max(0.0, min(1.0, fraction))
-            usage: dict[tuple[str, str], float] = {}
-            for material, color, grams in job.usage:
-                usage[(material, color)] = usage.get((material, color), 0.0) + (
-                    grams * fraction
-                )
+            usage: dict[UsageKey, float] = {}
+            for material, color, filament_id, grams in job.usage:
+                key = (material, color, filament_id)
+                usage[key] = usage.get(key, 0.0) + grams * fraction
             result, mapped = await self._manager.async_book(job.id, usage)
             self._set_last(
                 job,

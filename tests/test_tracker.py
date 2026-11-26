@@ -17,7 +17,7 @@ from custom_components.filament_stock.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from custom_components.filament_stock.parser import parse_3mf
-from custom_components.filament_stock.tracker import plate_from_gcode, snapshot
+from custom_components.filament_stock.tracker import Job, plate_from_gcode, snapshot
 
 SERIAL = "TESTSERIAL0001"
 KEYS = ("print_status", "print_progress", "gcode_file", "subtask_name")
@@ -308,9 +308,9 @@ def test_snapshot_unknown_plate_uses_whole_file() -> None:
     usage, plate, whole = snapshot(parsed, None)
     assert plate is None
     assert whole
-    assert dict(((m, c), g) for m, c, g in usage)[("PLA", "#898989")] == pytest.approx(
-        22.24
-    )
+    assert dict(((m, c, f), g) for m, c, f, g in usage)[
+        ("PLA", "#898989", "")
+    ] == pytest.approx(22.24)
     usage, plate, whole = snapshot(parsed, 9)
     assert whole
 
@@ -407,7 +407,9 @@ async def test_diagnostics_has_no_serial(
     assert state.attributes["printing"] is True
 
 
-def _cloud(spool_id: int, color: str, note: str, slot: int | None = None) -> dict:
+def _cloud(
+    spool_id: int, color: str, note: str, slot: int | None = None, profile: str = ""
+) -> dict:
     """Spool as the cloud returns it; slot is the AMS slot when loaded."""
     loaded = slot is not None
     return {
@@ -420,6 +422,7 @@ def _cloud(spool_id: int, color: str, note: str, slot: int | None = None) -> dic
         "inPrinter": loaded,
         "amsId": 0 if loaded else None,
         "slotId": str(slot) if loaded else "",
+        "filamentId": profile,
     }
 
 
@@ -475,3 +478,32 @@ async def test_two_loaded_spools_with_the_same_color_are_flagged(
     flagged = _last(entry)["ambiguous"]
     assert list(flagged) == ["PLA #FFFFFF"]
     assert len(flagged["PLA #FFFFFF"]) == 2
+
+
+def test_job_stored_before_the_profile_id_still_loads() -> None:
+    job = Job.from_dict(
+        {"serial": "S", "started": 1.0, "usage": [["PLA", "#FFFFFF", 12.5]]}
+    )
+    assert job.usage == [("PLA", "#FFFFFF", "", 12.5)]
+
+
+async def test_filament_id_picks_between_two_loaded_whites(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    bambu: FakeTransport,
+    setup_data: FakeDrive,
+) -> None:
+    spools = (
+        _cloud(11, "#FFFFFF", "Cotton White mat", slot=2, profile="GFL99"),
+        _cloud(12, "#FFFFFF", "Ivory White mat", slot=3, profile="GFA01"),
+    )
+    bambu.routes.pop(("GET", FILAMENT_PATH), None)
+    bambu.json("GET", FILAMENT_PATH, {"total": len(spools), "hits": list(spools)})
+    setup_data.listing.clear()
+    plate = [("PLA", "#FFFFFF", 368.25, "GFA01")]
+    setup_data.add("f1", FILE, build_3mf(slice_info([plate])))
+    await _setup(hass, entry)
+    await _start(hass)
+    await _status(hass, "finish")
+    assert _remaining(entry) == {11: 1000, 12: 631.75}
+    assert _last(entry)["ambiguous"] == {}

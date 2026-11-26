@@ -155,6 +155,7 @@ async def test_fetch_spools_paginates(transport: FakeTransport) -> None:
     client = BambuCloudClient(transport, token="tok")
     spools, raw = await client.fetch_spools()
     assert [s.id for s in spools] == [1, 3]
+    assert spools[0].filament_id == ""
     assert len(raw) == 3
     assert transport.calls[0]["params"] == {"offset": "0", "limit": "100"}
     assert transport.calls[1]["params"] == {"offset": "2", "limit": "100"}
@@ -286,3 +287,9 @@ async def test_curl_transport_network_error() -> None:
         pytest.raises(BambuError),
     ):
         await CurlTransport().request("GET", "https://api.bambulab.com/x")
+
+
+def test_parse_spool_reads_the_filament_profile_id() -> None:
+    spool = parse_spool(_hit(1, filamentId="GFA01"))
+    assert spool is not None
+    assert spool.filament_id == "GFA01"

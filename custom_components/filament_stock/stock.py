@@ -25,6 +25,7 @@ from .const import (
 from .ledger import Deduction, Ledger, SyncResult
 from .matcher import Match, Needs, fixed_key, map_needs, nearest_group
 from .models import GroupKey
+from .parser import UsageKey
 from .print_queue import QueueCoordinator
 from .spools import SpoolCoordinator
 
@@ -65,17 +66,24 @@ class FileColor:
     """A color used by sliced files in the queue, and how it is counted."""
 
     key: str  # stable id, e.g. 'pla_c12e1f'
-    match: Match
+    matches: dict[str, Match]  # by filament profile id ('' when the file has none)
     files: list[str]
     suggestion: tuple[str, float] | None  # nearest group at any distance
+
+    @property
+    def match(self) -> Match:
+        """One match stands for the color; they differ only in the chosen group."""
+        return self.matches[min(self.matches)]
 
     @property
     def label(self) -> str:
         return f"{self.match.material} {self.match.color}"
 
 
-def _source(match: Match) -> dict[str, Any]:
+def _source(match: Match, filament_id: str) -> dict[str, Any]:
     source: dict[str, Any] = {"color": match.color, "method": match.method.value}
+    if filament_id:
+        source["filament_id"] = filament_id
     if match.distance is not None:
         source["distance"] = match.distance
     if match.candidates:
@@ -194,9 +202,7 @@ class StockManager:
 
     # Computation
 
-    def _map(
-        self, usage: dict[tuple[str, str], float], prefer_loaded: bool = False
-    ) -> Needs:
+    def _map(self, usage: dict[UsageKey, float], prefer_loaded: bool = False) -> Needs:
         """Map grams per file color to grams per color group."""
         groups = self.spools.data.groups if self.spools.data else {}
         options = self._entry.options
@@ -233,14 +239,14 @@ class StockManager:
                     for s in group.spools
                 ],
             )
-        for match in self.needs.matches.values():
+        for (_, _, filament_id), match in self.needs.matches.items():
             if not match.matched:
                 self.unknown_meta[match.group_id] = (match.material, match.color)
             if match.group_id not in state:
                 state[match.group_id] = GroupState(
                     match.group_id, match.material, match.color
                 )
-            state[match.group_id].sources.append(_source(match))
+            state[match.group_id].sources.append(_source(match, filament_id))
         for group_id in self.ledger.shortage:
             if group_id not in state:
                 material, color = self.unknown_meta.get(group_id, ("?", group_id))
@@ -254,19 +260,23 @@ class StockManager:
         self.file_colors = self._file_colors(groups)
 
     def _file_colors(self, groups: dict[str, Any]) -> dict[str, FileColor]:
-        files: dict[tuple[str, str], list[str]] = {}
+        files: dict[tuple[str, str], set[str]] = {}
         for item in self.queue.data.sliced if self.queue.data else []:
             if item.parsed is None:
                 continue
-            for color_key in item.parsed.usage():
-                files.setdefault(color_key, []).append(item.name)
+            for material, color, _ in item.parsed.usage():
+                files.setdefault((material, color), set()).add(item.name)
         result: dict[str, FileColor] = {}
-        for (material, color), match in self.needs.matches.items():
+        # One entry per color: a fixed choice is per color, not per profile id.
+        for (material, color, filament_id), match in self.needs.matches.items():
             key = GroupKey.of(material, color, "").id
+            if key in result:
+                result[key].matches[filament_id] = match
+                continue
             result[key] = FileColor(
                 key=key,
-                match=match,
-                files=sorted(files.get((material, color), [])),
+                matches={filament_id: match},
+                files=sorted(files.get((material, color), set())),
                 suggestion=nearest_group(material, color, groups),
             )
         return result
@@ -306,7 +316,7 @@ class StockManager:
     # Booking a print
 
     async def async_book(
-        self, job_id: str, usage: dict[tuple[str, str], float]
+        self, job_id: str, usage: dict[UsageKey, float]
     ) -> tuple[Deduction, Needs]:
         """Deduct a print from the ledger and save at once."""
         mapped = self._map(usage, prefer_loaded=True)

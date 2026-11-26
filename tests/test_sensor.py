@@ -506,7 +506,7 @@ async def test_every_needed_color_gets_a_queue_select(
     brown_id = GroupKey.of("PLA", "#996633", "DFP14514 Wood-Brown mat").id
     assert _value(hass, entry, f"{brown_id}_needed") == pytest.approx(226.1)
     registry = er.async_get(hass)
-    for material, color in manager.needs.matches:
+    for material, color, _ in manager.needs.matches:
         key = GroupKey.of(material, color, "").id
         select = registry.async_get_entity_id(
             "select", DOMAIN, f"{entry.entry_id}_{key}_file_color"
@@ -522,3 +522,48 @@ async def test_every_needed_color_gets_a_queue_select(
     )
     assert state.attributes["method"] == "exact"
     assert state.attributes["files"] == ["brown.gcode.3mf"]
+
+
+async def test_one_select_per_color_shows_the_split_by_filament_id(
+    hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, plate: FakeDrive
+) -> None:
+    """Two whites with the same hex: files sliced with each profile split up."""
+    whites = [
+        {
+            "id": sid,
+            "color": "#FFFFFFFF",
+            "filamentType": "PLA",
+            "note": note,
+            "filamentId": profile,
+            "netWeight": 1000,
+            "totalNetWeight": 1000,
+            "inPrinter": sid == 21,
+        }
+        for sid, note, profile in ((21, "Cotton", "GFL99"), (22, "Ivory", "GFA01"))
+    ]
+    _spools(bambu, *whites)
+    plate.listing.clear()
+    plate.add(
+        "f1", "03.gcode.3mf", build_3mf(slice_info([[("PLA", "#FFFFFF", 94, "GFL99")]]))
+    )
+    plate.add(
+        "f2",
+        "022.gcode.3mf",
+        build_3mf(slice_info([[("PLA", "#FFFFFF", 368, "GFA01")]])),
+    )
+    await _setup(hass, entry)
+
+    cotton = GroupKey.of("PLA", "#FFFFFF", "Cotton").id
+    ivory = GroupKey.of("PLA", "#FFFFFF", "Ivory").id
+    assert _value(hass, entry, f"{cotton}_needed") == pytest.approx(94)
+    assert _value(hass, entry, f"{ivory}_needed") == pytest.approx(368)
+    state = hass.states.get(
+        er.async_get(hass).async_get_entity_id(
+            "select", DOMAIN, f"{entry.entry_id}_pla_ffffff_file_color"
+        )
+    )
+    assert state.attributes["files"] == ["022.gcode.3mf", "03.gcode.3mf"]
+    assert state.attributes["by_filament_id"] == {
+        "GFA01": "PLA #FFFFFF Ivory",
+        "GFL99": "PLA #FFFFFF Cotton",
+    }

@@ -30,6 +30,7 @@ class Spool:
     total_weight: float = 0.0  # full spool grams
     in_printer: bool = False
     updated_at: int | None = None
+    filament_id: str = ""  # Bambu profile id, e.g. 'GFA01'
 
     @property
     def group_key(self) -> GroupKey:
@@ -91,6 +92,10 @@ class ColorGroup:
     @property
     def in_printer(self) -> bool:
         return any(s.in_printer for s in self.spools)
+
+    @property
+    def filament_ids(self) -> set[str]:
+        return {s.filament_id for s in self.spools if s.filament_id}
 
     @property
     def label(self) -> str:
