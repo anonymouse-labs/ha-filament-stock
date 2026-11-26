@@ -77,6 +77,8 @@ The integration reads the folder with a Google **service account**, read-only (`
 
 Only files directly in that folder are read, not subfolders. Move printed plates to another folder (for example `done`) and they stop counting as needed. Their deduction is not lost.
 
+Move a plate only after the print is booked (last deduction shows **Booked**). The file is looked up in this folder when the print starts and when it ends. If it is already moved by then, nothing matches: the last deduction shows **No matching file** and no grams are deducted. The deduction is not made afterwards. Correct the stock by hand with **Edit stock**.
+
 ### How to make a sliced file
 
 In Bambu Studio slice the plate, then choose **File > Export > Export plate sliced file**. This gives a `.gcode.3mf`. A normal project file (`.3mf` without slicing) has no filament usage. It is listed as **Not sliced** and does not count.
