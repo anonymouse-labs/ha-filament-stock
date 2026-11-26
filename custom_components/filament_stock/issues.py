@@ -56,7 +56,12 @@ def async_track_issues(
             hass,
             f"unmatched_{entry.entry_id}",
             "unmatched_colors",
-            [f"{m.material} {m.color}" for m in manager.needs.unmatched],
+            # One color can come with several filament profiles: list it once.
+            list(
+                dict.fromkeys(
+                    f"{m.material} {m.color}" for m in manager.needs.unmatched
+                )
+            ),
             "colors",
         )
 

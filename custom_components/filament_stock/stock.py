@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 import logging
+import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -65,20 +66,23 @@ class GroupState:
 class FileColor:
     """A color used by sliced files in the queue, and how it is counted."""
 
-    key: str  # stable id, e.g. 'pla_c12e1f'
-    matches: dict[str, Match]  # by filament profile id ('' when the file has none)
+    key: str  # stable id, e.g. 'pla_c12e1f' or 'pla_ffffff_gfa01'
+    match: Match
+    filament_id: str  # slicer profile id, '' when the file has none
     files: list[str]
-    files_by_id: dict[str, list[str]]
     suggestion: tuple[str, float] | None  # nearest group at any distance
 
     @property
-    def match(self) -> Match:
-        """One match stands for the color; they differ only in the chosen group."""
-        return self.matches[min(self.matches)]
-
-    @property
     def label(self) -> str:
-        return f"{self.match.material} {self.match.color}"
+        label = f"{self.match.material} {self.match.color}"
+        return f"{label} {self.filament_id}" if self.filament_id else label
+
+
+def file_color_key(material: str, color: str, filament_id: str) -> str:
+    """Stable id per file color and filament profile, e.g. 'pla_ffffff_gfa01'."""
+    base = GroupKey.of(material, color, "").id
+    slug = re.sub(r"[^a-z0-9]+", "_", filament_id.lower()).strip("_")
+    return f"{base}_{slug}" if slug else base
 
 
 def _source(match: Match, filament_id: str) -> dict[str, Any]:
@@ -268,22 +272,17 @@ class StockManager:
             for usage_key in item.parsed.usage():
                 files.setdefault(usage_key, set()).add(item.name)
         result: dict[str, FileColor] = {}
-        # One entry per color: a fixed choice is per color, not per profile id.
-        for (material, color, filament_id), match in self.needs.matches.items():
-            key = GroupKey.of(material, color, "").id
-            names = sorted(files.get((material, color, filament_id), set()))
-            if key not in result:
-                result[key] = FileColor(
-                    key=key,
-                    matches={},
-                    files=[],
-                    files_by_id={},
-                    suggestion=nearest_group(material, color, groups),
-                )
-            entry = result[key]
-            entry.matches[filament_id] = match
-            entry.files_by_id[filament_id] = names
-            entry.files = sorted({*entry.files, *names})
+        # One entry per color and filament profile: each can be its own spool.
+        for usage_key, match in self.needs.matches.items():
+            material, color, filament_id = usage_key
+            key = file_color_key(material, color, filament_id)
+            result[key] = FileColor(
+                key=key,
+                match=match,
+                filament_id=filament_id,
+                files=sorted(files.get(usage_key, set())),
+                suggestion=nearest_group(material, color, groups),
+            )
         return result
 
     def group_choices(self) -> dict[str, str]:
@@ -336,8 +335,10 @@ class StockManager:
     # Actions
 
     @callback
-    def set_fixed(self, material: str, color: str, group_id: str | None) -> None:
-        key = fixed_key(material, color)
+    def set_fixed(
+        self, material: str, color: str, group_id: str | None, filament_id: str = ""
+    ) -> None:
+        key = fixed_key(material, color, filament_id)
         if group_id is None:
             self.fixed.pop(key, None)
         else:

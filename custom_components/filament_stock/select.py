@@ -68,8 +68,12 @@ class FileColorSelect(FilamentStockEntity, SelectEntity):
         color = self._color
         if color is None:
             return None
-        target = self.manager.fixed.get(
-            fixed_key(color.match.material, color.match.color)
+        material, hex_color = color.match.material, color.match.color
+        # A choice for this profile, else one for the whole color (map_color).
+        fixed = self.manager.fixed
+        target = fixed.get(
+            fixed_key(material, hex_color, color.filament_id),
+            fixed.get(fixed_key(material, hex_color)),
         )
         for label, group_id in self.manager.group_choices().items():
             if group_id == target:
@@ -91,22 +95,8 @@ class FileColorSelect(FilamentStockEntity, SelectEntity):
         }
         if match.distance is not None:
             attrs["distance"] = match.distance
-        if len({m.group_id for m in color.matches.values()}) > 1:
-            # Same color, other filament profile: files count on other groups.
-            split: dict[str, dict[str, Any]] = {}
-            for fid, m in sorted(color.matches.items()):
-                part = split.setdefault(
-                    m.group_id,
-                    {
-                        "counted_as": self._label(m.group_id),
-                        "method": m.method.value,
-                        "filament_ids": [],
-                        "files": [],
-                    },
-                )
-                part["filament_ids"].append(fid)
-                part["files"] = sorted({*part["files"], *color.files_by_id[fid]})
-            attrs["split"] = list(split.values())
+        if color.filament_id:
+            attrs["filament_id"] = color.filament_id
         if color.suggestion:
             attrs["nearest"] = self._label(color.suggestion[0])
             attrs["nearest_distance"] = color.suggestion[1]
@@ -121,4 +111,6 @@ class FileColorSelect(FilamentStockEntity, SelectEntity):
         if color is None:
             return
         target = None if option == AUTO else self.manager.group_choices()[option]
-        self.manager.set_fixed(color.match.material, color.match.color, target)
+        self.manager.set_fixed(
+            color.match.material, color.match.color, target, color.filament_id
+        )

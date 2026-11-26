@@ -244,3 +244,19 @@ def test_filament_id_resolves_two_loaded_spools_of_one_color() -> None:
     assert booked.candidates == ()
     unsure = match_color("PLA", "#FFFFFF", groups, {}, prefer_loaded=True)
     assert len(unsure.candidates) == 2
+
+
+def test_fixed_choice_per_filament_id_beats_one_for_the_color() -> None:
+    groups = _whites()
+    cotton = GroupKey.of("PLA", "#FFFFFF", "Cotton").id
+    ivory = GroupKey.of("PLA", "#FFFFFF", "Ivory").id
+    fixed = {
+        fixed_key("PLA", "#FFFFFF"): ivory,
+        fixed_key("PLA", "#FFFFFF", "GFL99"): cotton,
+    }
+    assert fixed_key("pla", "#ffffff", "GFL99") == "PLA|#FFFFFF|GFL99"
+    for filament_id, expected in (("GFL99", cotton), ("GFA01", ivory), ("", ivory)):
+        match = match_color(
+            "PLA", "#FFFFFF", groups, {}, filament_id=filament_id, fixed=fixed
+        )
+        assert (match.group_id, match.method) == (expected, MatchMethod.FIXED)

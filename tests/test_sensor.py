@@ -524,10 +524,10 @@ async def test_every_needed_color_gets_a_queue_select(
     assert state.attributes["files"] == ["brown.gcode.3mf"]
 
 
-async def test_one_select_per_color_shows_the_split_by_filament_id(
+async def test_one_select_per_color_and_filament_profile(
     hass: HomeAssistant, entry: MockConfigEntry, bambu: FakeTransport, plate: FakeDrive
 ) -> None:
-    """Two whites with the same hex: files sliced with each profile split up."""
+    """Two whites with the same hex: each filament profile has its own select."""
     whites = [
         {
             "id": sid,
@@ -557,23 +557,33 @@ async def test_one_select_per_color_shows_the_split_by_filament_id(
     ivory = GroupKey.of("PLA", "#FFFFFF", "Ivory").id
     assert _value(hass, entry, f"{cotton}_needed") == pytest.approx(94)
     assert _value(hass, entry, f"{ivory}_needed") == pytest.approx(368)
-    state = hass.states.get(
-        er.async_get(hass).async_get_entity_id(
+    registry = er.async_get(hass)
+    selects = {
+        profile: registry.async_get_entity_id(
+            "select", DOMAIN, f"{entry.entry_id}_pla_ffffff_{profile}_file_color"
+        )
+        for profile in ("gfl99", "gfa01")
+    }
+    assert (
+        registry.async_get_entity_id(
             "select", DOMAIN, f"{entry.entry_id}_pla_ffffff_file_color"
         )
+        is None
     )
-    assert state.attributes["files"] == ["022.gcode.3mf", "03.gcode.3mf"]
-    assert state.attributes["split"] == [
-        {
-            "counted_as": "PLA #FFFFFF Ivory",
-            "method": "filament_id",
-            "filament_ids": ["GFA01"],
-            "files": ["022.gcode.3mf"],
-        },
-        {
-            "counted_as": "PLA #FFFFFF Cotton",
-            "method": "filament_id",
-            "filament_ids": ["GFL99"],
-            "files": ["03.gcode.3mf"],
-        },
-    ]
+    ivory_select = hass.states.get(selects["gfa01"])
+    assert ivory_select.attributes["filament_id"] == "GFA01"
+    assert ivory_select.attributes["counted_as"] == "PLA #FFFFFF Ivory"
+    assert ivory_select.attributes["files"] == ["022.gcode.3mf"]
+    assert ivory_select.name == "Filament Stock PLA #FFFFFF GFA01 in files"
+    assert hass.states.get(selects["gfl99"]).attributes["files"] == ["03.gcode.3mf"]
+
+    # A fixed choice for one profile leaves the other profile alone.
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": selects["gfa01"], "option": "PLA #FFFFFF Cotton"},
+        blocking=True,
+    )
+    assert _value(hass, entry, f"{cotton}_needed") == pytest.approx(462)
+    assert _value(hass, entry, f"{ivory}_needed") == 0
+    assert hass.states.get(selects["gfl99"]).state == "auto"

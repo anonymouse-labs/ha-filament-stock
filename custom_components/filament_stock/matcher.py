@@ -1,7 +1,8 @@
 """Match a file color (material, hex) to a color group.
 
 Pure Python, no Home Assistant imports. Order:
-1. A fixed mapping set by the user.
+1. A fixed mapping set by the user: for the color and filament profile id,
+   else for the color.
 2. Exact material and hex. Several groups (same hex, other note): the group
    whose spools have the file's filament profile id, then the group with a
    spool in the printer, else the group with the most stock.
@@ -87,7 +88,7 @@ def match_color(
     max_distance: float = DEFAULT_MAX_DISTANCE,
     prefer_loaded: bool = False,
 ) -> Match:
-    """Match one file color. `fixed` maps 'MATERIAL|#RRGGBB' to a group id.
+    """Match one file color. `fixed` maps a `fixed_key` to a group id.
 
     With `prefer_loaded` (used when booking a print) the groups with a spool in
     the printer are tried first: the print used what was loaded. The
@@ -96,9 +97,10 @@ def match_color(
     material = normalize_material(material)
     color = color.upper()
 
-    target = (fixed or {}).get(fixed_key(material, color))
-    if target is not None and target in groups:
-        return Match(material, color, target, MatchMethod.FIXED)
+    for key in (fixed_key(material, color, filament_id), fixed_key(material, color)):
+        target = (fixed or {}).get(key)
+        if target is not None and target in groups:
+            return Match(material, color, target, MatchMethod.FIXED)
 
     same_material = [g for g in groups.values() if g.material == material]
     if prefer_loaded:
@@ -156,8 +158,10 @@ def match_color(
     return Match(material, color, unknown_group_id(material, color), MatchMethod.NONE)
 
 
-def fixed_key(material: str, color: str) -> str:
-    return f"{normalize_material(material)}|{color.upper()}"
+def fixed_key(material: str, color: str, filament_id: str = "") -> str:
+    """'MATERIAL|#RRGGBB', with '|<filament id>' for one filament profile."""
+    key = f"{normalize_material(material)}|{color.upper()}"
+    return f"{key}|{filament_id}" if filament_id else key
 
 
 def map_needs(
