@@ -85,8 +85,12 @@ def file_color_key(material: str, color: str, filament_id: str) -> str:
     return f"{base}_{slug}" if slug else base
 
 
-def _source(match: Match, filament_id: str) -> dict[str, Any]:
-    source: dict[str, Any] = {"color": match.color, "method": match.method.value}
+def _source(match: Match, filament_id: str, files: list[str]) -> dict[str, Any]:
+    source: dict[str, Any] = {
+        "color": match.color,
+        "method": match.method.value,
+        "files": files,
+    }
     if filament_id:
         source["filament_id"] = filament_id
     if match.distance is not None:
@@ -244,14 +248,18 @@ class StockManager:
                     for s in group.spools
                 ],
             )
-        for (_, _, filament_id), match in self.needs.matches.items():
+        files = self._files_by_usage()
+        for usage_key, match in self.needs.matches.items():
+            filament_id = usage_key[2]
             if not match.matched:
                 self.unknown_meta[match.group_id] = (match.material, match.color)
             if match.group_id not in state:
                 state[match.group_id] = GroupState(
                     match.group_id, match.material, match.color
                 )
-            state[match.group_id].sources.append(_source(match, filament_id))
+            state[match.group_id].sources.append(
+                _source(match, filament_id, sorted(files.get(usage_key, ())))
+            )
         for group_id in self.ledger.shortage:
             if group_id not in state:
                 material, color = self.unknown_meta.get(group_id, ("?", group_id))
@@ -264,13 +272,17 @@ class StockManager:
         self.state = state
         self.file_colors = self._file_colors(groups)
 
-    def _file_colors(self, groups: dict[str, Any]) -> dict[str, FileColor]:
+    def _files_by_usage(self) -> dict[UsageKey, set[str]]:
         files: dict[UsageKey, set[str]] = {}
         for item in self.queue.data.sliced if self.queue.data else []:
             if item.parsed is None:
                 continue
             for usage_key in item.parsed.usage():
                 files.setdefault(usage_key, set()).add(item.name)
+        return files
+
+    def _file_colors(self, groups: dict[str, Any]) -> dict[str, FileColor]:
+        files = self._files_by_usage()
         result: dict[str, FileColor] = {}
         # One entry per color and filament profile: each can be its own spool.
         for usage_key, match in self.needs.matches.items():

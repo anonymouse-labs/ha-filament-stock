@@ -96,6 +96,7 @@ class GroupSensor(GroupEntity, SensorEntity):
             attrs["stock"] = round(self._item.stock, 1)
             attrs["spools"] = self._item.spools
         attrs["file_colors"] = self._item.sources
+        attrs["files"] = sorted({f for s in self._item.sources for f in s["files"]})
         return attrs
 
 

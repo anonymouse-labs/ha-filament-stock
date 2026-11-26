@@ -29,4 +29,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Last deduction names the grams per color group like the stock list (for example `PLA · DHM00001 Zwart`) instead of the raw file color.
 - Color group entities have `r`, `g` and `b` attributes (0 to 255) for color pickers that ask for decimal values.
 - Spools with the same material and color (for example two whites with another note) are told apart by the filament profile id in the sliced file (`tray_info_idx`, such as `GFA01`) and the spool in Bambu Studio. Used for the needed sensors, and at booking only between loaded spools. Each color and profile has its own `… in files` select and fixed choice; a choice from `map_color` still covers the whole color. Cached queue files are parsed again once.
+- Attribute `files` on the `… needed` and `… balance` sensors: names of the sliced files that count on that color group. Each entry in `file_colors` lists its files too.
 - Own brand icon, README with setup guide, security policy, contributing guide and issue templates.

@@ -109,7 +109,7 @@ Per color group, for example `PLA #006633 matte`:
 | `… needed` (sensor) | Grams needed by the sliced files in the queue. |
 | `… balance` (sensor) | Stock minus needed. Negative means you need more filament. |
 
-Attributes: `material`, `color`, `note`, `spools` (id, name, vendor, remaining, in printer) and `file_colors` (which file colors count here and how they were matched).
+Attributes: `material`, `color`, `note`, `spools` (id, name, vendor, remaining, in printer), `file_colors` (which file colors count here and how they were matched, with their files) and `files` (names of the sliced files that count on this group).
 
 **Changing the stock in Home Assistant.** Enter a new value in the stock number, for example after weighing a spool. It is stored as a local correction for the color group (attribute `correction`), prints are deducted from it, and the balance follows. When the remaining weight of a spool of that group changes in Bambu Studio, the cloud value wins again. The value is not written to the Bambu Lab cloud.
 

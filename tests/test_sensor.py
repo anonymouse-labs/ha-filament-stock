@@ -112,6 +112,8 @@ async def test_reference_plate_balance(
     )
     assert state.attributes["spools"][0]["name"] == "PLA Basic"
     assert state.attributes["file_colors"][0]["method"] == "nearest"
+    assert state.attributes["file_colors"][0]["files"] == ["plate.gcode.3mf"]
+    assert state.attributes["files"] == ["plate.gcode.3mf"]
     assert state.attributes["unit_of_measurement"] == "g"
     assert state.name == "Filament Stock PLA #000000 balance"
 
